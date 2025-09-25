@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { FaHome, FaClock, FaCog, FaChevronDown } from 'react-icons/fa'; // Icons for the tabs
+import { FaHome, FaClock, FaCog } from 'react-icons/fa'; // Icons for the tabs
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { 
+  ThemeProvider, 
+  createTheme, 
+  ToggleButton, 
+  ToggleButtonGroup, 
+  Select, 
+  MenuItem, 
+  FormControl, 
+  InputLabel,
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Chip
+} from '@mui/material';
+import { KeyboardArrowDown } from '@mui/icons-material';
 
 /*
  * Productivv - Dynamic Time Tracking App
@@ -78,6 +94,24 @@ const getEmptyData = () => {
   return {};
 };
 
+// Create Material-UI theme
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#0988b1',
+    },
+    secondary: {
+      main: '#36494f',
+    },
+    background: {
+      default: '#f8fdff',
+    },
+  },
+  typography: {
+    fontFamily: 'Arial, sans-serif',
+  },
+});
+
 const App = () => {
   // State to track the selected tab
   const [activeTab, setActiveTab] = useState('Home');
@@ -90,7 +124,6 @@ const App = () => {
   
   // State to track selected date/date range
   const [selectedDate, setSelectedDate] = useState('');
-  const [showDateDropdown, setShowDateDropdown] = useState(false);
   
   // Current date for reference - Set to September 24th, 2024 for demo
   const [currentDate] = useState(new Date('2024-09-24'));
@@ -196,353 +229,247 @@ const App = () => {
   const percentageChange = 0; // No comparison initially
 
   return (
-    <div style={styles.container}>
-      {/* Title */}
-      <div style={styles.titleContainer}>
-        <h1 style={styles.title}>Productivv</h1>
-      </div>
+    <ThemeProvider theme={theme}>
+      <Box sx={{ 
+        fontFamily: 'Arial, sans-serif',
+        backgroundColor: '#f8fdff',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+      }}>
+        {/* Title */}
+        <Box sx={{ textAlign: 'center', mb: 2 }}>
+          <Typography variant="h3" component="h1" color="text.primary" sx={{ m: 0 }}>
+            Productivv
+          </Typography>
+        </Box>
 
-      {/* Conditional Rendering Based on Active Tab */}
-      <div style={styles.content}>
-        {activeTab === 'Home' && (
-          <>
-            <div style={styles.topRow}>
-              <div style={styles.toggleWrapper}>
-                <div
-                  style={{
-                    ...styles.slider,
-                    transform: view === 'Day' ? 'translateX(0)' : 'translateX(100%)',
+        {/* Conditional Rendering Based on Active Tab */}
+        <Box sx={{ flex: 1, p: 2 }}>
+          {activeTab === 'Home' && (
+            <>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <ToggleButtonGroup
+                  value={view}
+                  exclusive
+                  onChange={(event, newView) => {
+                    if (newView !== null) {
+                      setView(newView);
+                      if (newView === 'Day') {
+                        setSelectedDate(formatDate(currentDate));
+                      } else {
+                        const { startOfWeek, endOfWeek } = getWeekDates(currentDate);
+                        setSelectedDate(formatDateRange(startOfWeek, endOfWeek));
+                      }
+                    }
                   }}
-                />
-                <button style={styles.toggleButton} onClick={() => {
-                  setView('Day');
-                  setSelectedDate(formatDate(currentDate));
-                  setShowDateDropdown(false);
-                }}>
-                  Day
-                </button>
-                <button style={styles.toggleButton} onClick={() => {
-                  setView('Week');
-                  const { startOfWeek, endOfWeek } = getWeekDates(currentDate);
-                  setSelectedDate(formatDateRange(startOfWeek, endOfWeek));
-                  setShowDateDropdown(false);
-                }}>
-                  Week
-                </button>
-              </div>
-              <p style={styles.viewText}>Current View: {view}</p>
-            </div>
-            
-            {/* Date Dropdown */}
-            <div style={styles.dateDropdownContainer}>
-              <button 
-                style={styles.dateDropdownButton}
-                onClick={() => setShowDateDropdown(!showDateDropdown)}
-              >
-                {selectedDate}
-                <FaChevronDown style={styles.dropdownIcon} />
-              </button>
-              {showDateDropdown && (
-                <div style={styles.dropdownMenu}>
-                  {view === 'Week' ? (
-                    getWeekOptions(currentDate).map((option, index) => (
-                      <div 
-                        key={index}
-                        style={styles.dropdownItem} 
-                        onClick={() => {
-                          setSelectedDate(option.label);
-                          setShowDateDropdown(false);
-                        }}
-                      >
-                        {option.label}
-                      </div>
-                    ))
-                  ) : (
-                    getDayOptions(currentDate).map((option, index) => (
-                      <div 
-                        key={index}
-                        style={styles.dropdownItem} 
-                        onClick={() => {
-                          setSelectedDate(option.label);
-                          setShowDateDropdown(false);
-                        }}
-                      >
-                        {option.label}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Chart Section */}
-            <div style={styles.chartContainer}>
-              <div style={styles.chartHeader}>
-                <div style={styles.chartTitle}>Time Usage</div>
-                <div style={styles.chartSubtitle}>{formatTime(totalTime)}</div>
-                <div style={styles.comparisonBadge}>
-                  <span style={styles.arrow}>{percentageChange >= 0 ? '↗' : '↘'}</span> 
-                  {Math.abs(percentageChange)}% from last {view.toLowerCase()}
-                </div>
-              </div>
+                  aria-label="view selection"
+                  sx={{
+                    '& .MuiToggleButton-root': {
+                      border: '1px solid #0988b1',
+                      color: '#0988b1',
+                      '&.Mui-selected': {
+                        backgroundColor: '#0988b1',
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: '#077a9e',
+                        },
+                      },
+                      '&:hover': {
+                        backgroundColor: 'rgba(9, 136, 177, 0.1)',
+                      },
+                    },
+                  }}
+                >
+                  <ToggleButton value="Day">Day</ToggleButton>
+                  <ToggleButton value="Week">Week</ToggleButton>
+                </ToggleButtonGroup>
+                <Typography variant="body1" color="text.secondary">
+                  Current View: {view}
+                </Typography>
+              </Box>
               
-              <div style={styles.rechartsContainer}>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                    <XAxis 
-                      dataKey="day" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: '#666' }}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: '#666' }}
-                      domain={[0, 10]}
-                      ticks={[0, 5, 10]}
-                      tickFormatter={(value) => `${value}h`}
-                    />
-                    <ReferenceLine 
-                      y={6} 
-                      stroke="#333" 
-                      strokeDasharray="5 5" 
-                      label={{ value: "avg", position: "right", style: { fontSize: 10, fill: '#333' } }}
-                    />
-                    <Bar 
-                      dataKey="total" 
-                      fill="#e0e0e0" 
-                      radius={[2, 2, 0, 0]}
-                      maxBarSize={20}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </>
-        )}
+              {/* Date Dropdown */}
+              <Box sx={{ mb: 3 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="date-select-label">Select Date</InputLabel>
+                  <Select
+                    labelId="date-select-label"
+                    value={selectedDate}
+                    label="Select Date"
+                    onChange={(event) => setSelectedDate(event.target.value)}
+                    IconComponent={KeyboardArrowDown}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': {
+                          borderColor: '#0988b1',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#077a9e',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#0988b1',
+                        },
+                      },
+                    }}
+                  >
+                    {view === 'Week' ? (
+                      getWeekOptions(currentDate).map((option, index) => (
+                        <MenuItem key={index} value={option.label}>
+                          {option.label}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      getDayOptions(currentDate).map((option, index) => (
+                        <MenuItem key={index} value={option.label}>
+                          {option.label}
+                        </MenuItem>
+                      ))
+                    )}
+                  </Select>
+                </FormControl>
+              </Box>
 
-        {activeTab === 'Logs' && <p style={styles.placeholderText}>Previous Logs (Coming Soon)</p>}
+              {/* Chart Section */}
+              <Card sx={{ maxWidth: 400, mx: 'auto', mb: 2 }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" component="div" color="text.primary">
+                      Time Usage
+                    </Typography>
+                    <Typography variant="h5" component="div" color="primary" fontWeight="bold">
+                      {formatTime(totalTime)}
+                    </Typography>
+                    <Chip
+                      icon={<span>{percentageChange >= 0 ? '↗' : '↘'}</span>}
+                      label={`${Math.abs(percentageChange)}% from last ${view.toLowerCase()}`}
+                      color="primary"
+                      variant="outlined"
+                      size="small"
+                    />
+                  </Box>
+                  
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                        <XAxis 
+                          dataKey="day" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: '#666' }}
+                        />
+                        <YAxis 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: '#666' }}
+                          domain={[0, 10]}
+                          ticks={[0, 5, 10]}
+                          tickFormatter={(value) => `${value}h`}
+                        />
+                        <ReferenceLine 
+                          y={6} 
+                          stroke="#333" 
+                          strokeDasharray="5 5" 
+                          label={{ value: "avg", position: "right", style: { fontSize: 10, fill: '#333' } }}
+                        />
+                        <Bar 
+                          dataKey="total" 
+                          fill="#0988b1" 
+                          radius={[2, 2, 0, 0]}
+                          maxBarSize={20}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </>
+          )}
 
-        {activeTab === 'Settings' && <p style={styles.placeholderText}>Settings (Coming Soon)</p>}
-      </div>
+          {activeTab === 'Logs' && (
+            <Typography variant="h6" color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
+              Previous Logs (Coming Soon)
+            </Typography>
+          )}
 
-      {/* Bottom Navigation */}
-      <div style={styles.navbar}>
-        <button
-          style={activeTab === 'Home' ? styles.activeNavButton : styles.navButton}
-          onClick={() => setActiveTab('Home')}
-        >
-          <FaHome /> <span>Home</span>
-        </button>
-        <button
-          style={activeTab === 'Logs' ? styles.activeNavButton : styles.navButton}
-          onClick={() => setActiveTab('Logs')}
-        >
-          <FaClock /> <span>Logs</span>
-        </button>
-        <button
-          style={activeTab === 'Settings' ? styles.activeNavButton : styles.navButton}
-          onClick={() => setActiveTab('Settings')}
-        >
-          <FaCog /> <span>Settings</span>
-        </button>
-      </div>
-    </div>
+          {activeTab === 'Settings' && (
+            <Typography variant="h6" color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
+              Settings (Coming Soon)
+            </Typography>
+          )}
+        </Box>
+
+        {/* Bottom Navigation */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-around',
+          backgroundColor: '#ffffff',
+          p: 1,
+          borderTop: '1px solid #ddd',
+          position: 'fixed',
+          bottom: 0,
+          width: '100%',
+        }}>
+          <button
+            style={{
+              flex: 1,
+              background: 'none',
+              border: 'none',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              color: activeTab === 'Home' ? '#0988b1' : '#777',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: '10px 0',
+              fontWeight: activeTab === 'Home' ? 'bold' : 'normal',
+            }}
+            onClick={() => setActiveTab('Home')}
+          >
+            <FaHome /> <span>Home</span>
+          </button>
+          <button
+            style={{
+              flex: 1,
+              background: 'none',
+              border: 'none',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              color: activeTab === 'Logs' ? '#0988b1' : '#777',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: '10px 0',
+              fontWeight: activeTab === 'Logs' ? 'bold' : 'normal',
+            }}
+            onClick={() => setActiveTab('Logs')}
+          >
+            <FaClock /> <span>Logs</span>
+          </button>
+          <button
+            style={{
+              flex: 1,
+              background: 'none',
+              border: 'none',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              color: activeTab === 'Settings' ? '#0988b1' : '#777',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: '10px 0',
+              fontWeight: activeTab === 'Settings' ? 'bold' : 'normal',
+            }}
+            onClick={() => setActiveTab('Settings')}
+          >
+            <FaCog /> <span>Settings</span>
+          </button>
+        </Box>
+      </Box>
+    </ThemeProvider>
   );
-};
-
-// Styles
-const styles = {
-  container: {
-    fontFamily: 'Arial, sans-serif',
-    backgroundColor: '#f8fdff',
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between', // Ensures navbar stays at the bottom
-  },
-  titleContainer: {
-    textAlign: 'center',
-    marginBottom: '20px',
-  },
-  title: {
-    fontSize: '2rem',
-    margin: '0',
-    color: '#36494f',
-  },
-  content: {
-    flex: 1, // Pushes navbar to bottom
-    padding: '20px',
-  },
-  toggleWrapper: {
-    display: 'flex',
-    position: 'relative',
-    width: '150px',
-    height: '40px',
-    backgroundColor: '#f1f1f1',
-    borderRadius: '25px',
-    overflow: 'hidden',
-    boxShadow: '0 0 3px rgba(0,0,0,0.2)',
-  },
-  slider: {
-    position: 'absolute',
-    width: '50%',
-    height: '100%',
-    backgroundColor: '#0988b1',
-    borderRadius: '25px',
-    transition: 'transform 0.3s ease',
-  },
-  toggleButton: {
-    flex: 1,
-    background: 'none',
-    border: 'none',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    zIndex: 1,
-    color: '#333',
-    fontWeight: 'bold',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  viewText: {
-    fontSize: '1rem',
-    color: '#36494f',
-    margin: 0,
-  },
-  dateDropdownContainer: {
-    position: 'relative',
-    marginBottom: '30px',
-  },
-  dateDropdownButton: {
-    width: '100%',
-    padding: '12px 16px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    backgroundColor: '#fff',
-    fontSize: '1rem',
-    color: '#36494f',
-    cursor: 'pointer',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  dropdownIcon: {
-    fontSize: '0.8rem',
-    color: '#666',
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-    zIndex: 1000,
-    marginTop: '4px',
-  },
-  dropdownItem: {
-    padding: '12px 16px',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-    color: '#36494f',
-    borderBottom: '1px solid #f0f0f0',
-  },
-  chartContainer: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '20px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: '20px',
-    width: '100%',
-    maxWidth: '400px', // Make it more square-shaped
-    margin: '0 auto 20px auto',
-  },
-  rechartsContainer: {
-    width: '100%',
-    height: '300px', // Increased height for more square appearance
-  },
-  chartHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  chartTitle: {
-    fontSize: '1.2rem',
-    fontWeight: 'bold',
-    color: '#36494f',
-  },
-  chartSubtitle: {
-    fontSize: '1.5rem',
-    fontWeight: 'bold',
-    color: '#36494f',
-  },
-  comparisonBadge: {
-    backgroundColor: '#f0f8ff',
-    color: '#0988b1',
-    padding: '6px 12px',
-    borderRadius: '20px',
-    fontSize: '0.8rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
-  arrow: {
-    fontSize: '0.7rem',
-  },
-  placeholderText: {
-    fontSize: '1.2rem',
-    color: '#777',
-    textAlign: 'center',
-    marginTop: '50px',
-  },
-  navbar: {
-    display: 'flex',
-    justifyContent: 'space-around',
-    backgroundColor: '#ffffff',
-    padding: '10px 0',
-    borderTop: '1px solid #ddd',
-    position: 'fixed',
-    bottom: 0,
-    width: '100%',
-  },
-  navButton: {
-    flex: 1,
-    background: 'none',
-    border: 'none',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    color: '#777',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '10px 0',
-  },
-  activeNavButton: {
-    flex: 1,
-    background: 'none',
-    border: 'none',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    color: '#0988b1',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '10px 0',
-    fontWeight: 'bold',
-  },
 };
 
 export default App;
