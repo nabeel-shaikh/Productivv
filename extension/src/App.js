@@ -29,7 +29,14 @@ import {
   Checkbox,
   List,
   ListItem,
-  ListItemButton
+  ListItemButton,
+  Switch,
+  TextField,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  ToggleButtonGroup as FilterToggle,
+  ToggleButton as FilterButton
 } from '@mui/material';
 import { 
   KeyboardArrowDown, 
@@ -41,7 +48,9 @@ import {
   Help, 
   Info,
   Search,
-  ArrowBack
+  ArrowBack,
+  ExpandMore,
+  PowerSettingsNew
 } from '@mui/icons-material';
 
 /*
@@ -120,6 +129,72 @@ const getEmptyData = () => {
   return {};
 };
 
+// Mock data for fallback when API is not available
+const getMockActivityLogs = () => [
+  {
+    id: 1,
+    title: 'GitHub - Repository',
+    url: 'github.com/user/repo',
+    duration: '2h 15m',
+    date: new Date().toISOString().split('T')[0],
+    productive: true,
+    timestamp: new Date()
+  },
+  {
+    id: 2,
+    title: 'YouTube - Video',
+    url: 'youtube.com/watch',
+    duration: '45m',
+    date: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+    productive: false,
+    timestamp: new Date(Date.now() - 86400000)
+  },
+  {
+    id: 3,
+    title: 'Stack Overflow',
+    url: 'stackoverflow.com/question',
+    duration: '1h 30m',
+    date: new Date(Date.now() - 172800000).toISOString().split('T')[0], // 2 days ago
+    productive: true,
+    timestamp: new Date(Date.now() - 172800000)
+  },
+  {
+    id: 4,
+    title: 'Reddit - Discussion',
+    url: 'reddit.com/r/programming',
+    duration: '20m',
+    date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
+    productive: false,
+    timestamp: new Date(Date.now() - 172800000)
+  },
+  {
+    id: 5,
+    title: 'Documentation',
+    url: 'docs.example.com',
+    duration: '3h 10m',
+    date: new Date().toISOString().split('T')[0],
+    productive: true,
+    timestamp: new Date()
+  }
+];
+
+// API connection placeholder
+const fetchLogsFromMongo = async (dateRange) => {
+  try {
+    // TODO: Replace with actual API call
+    // const response = await fetch(`/api/logs?dateRange=${dateRange}`);
+    // const data = await response.json();
+    // return data;
+    
+    // For now, return mock data
+    console.log('Fetching logs for date range:', dateRange);
+    return getMockActivityLogs();
+  } catch (error) {
+    console.error('Error fetching logs:', error);
+    return getMockActivityLogs(); // Fallback to mock data
+  }
+};
+
 // Create Material-UI theme
 const theme = createTheme({
   palette: {
@@ -141,6 +216,22 @@ const theme = createTheme({
     h3: {
       fontWeight: 600,
       color: '#2c3e50',
+      fontSize: '1.5rem', // Smaller for popup
+    },
+    h5: {
+      fontSize: '1.1rem', // Smaller for popup
+    },
+    h6: {
+      fontSize: '1rem', // Smaller for popup
+    },
+  },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        },
+      },
     },
   },
 });
@@ -158,12 +249,20 @@ const App = () => {
   // State to track selected date/date range
   const [selectedDate, setSelectedDate] = useState('');
   
-  // Current date for reference - Set to September 24th, 2024 for demo
-  const [currentDate] = useState(new Date('2024-09-24'));
+  // Current date for reference - Use actual current date
+  const [currentDate] = useState(new Date());
   
   // State for menu
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
+
+  // New state variables for functionality
+  const [isExtensionActive, setIsExtensionActive] = useState(true);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [filteredLogs, setFilteredLogs] = useState([]);
+  const [productiveFilter, setProductiveFilter] = useState('all'); // 'all', 'productive', 'unproductive'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
   
   // Data persistence functions
   const saveTimeData = (data) => {
@@ -218,6 +317,66 @@ const App = () => {
     }
   };
 
+  // New handler functions for enhanced functionality
+  const handleCheckboxChange = (index) => {
+    setActivityLogs(prev => prev.map((log, i) => 
+      i === index ? { ...log, productive: !log.productive } : log
+    ));
+    // TODO: Update backend when API is ready
+  };
+
+  const handleProductiveFilterChange = (event, newFilter) => {
+    if (newFilter !== null) {
+      setProductiveFilter(newFilter);
+    }
+  };
+
+  const filterLogs = () => {
+    let filtered = activityLogs;
+
+    // Filter by productive status
+    if (productiveFilter !== 'all') {
+      filtered = filtered.filter(log => 
+        productiveFilter === 'productive' ? log.productive : !log.productive
+      );
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(log => 
+        log.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.url.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filter by selected date
+    if (selectedDate) {
+      if (view === 'Day') {
+        filtered = filtered.filter(log => log.date === selectedDate);
+      } else {
+        // Week view - parse date range
+        const [startDate, endDate] = selectedDate.split('_');
+        filtered = filtered.filter(log => log.date >= startDate && log.date <= endDate);
+      }
+    }
+
+    setFilteredLogs(filtered);
+  };
+
+  // Load activity logs
+  const loadActivityLogs = async () => {
+    setLoading(true);
+    try {
+      const logs = await fetchLogsFromMongo(selectedDate || 'all');
+      setActivityLogs(logs);
+    } catch (error) {
+      console.error('Error loading activity logs:', error);
+      setActivityLogs(getMockActivityLogs());
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Initialize data and selected date
   useEffect(() => {
     // Start with empty data - no tracking data initially
@@ -232,6 +391,18 @@ const App = () => {
       setSelectedDate(formatDate(currentDate));
     }
   }, [view, currentDate]);
+
+  // Load activity logs when component mounts or date changes
+  useEffect(() => {
+    if (isExtensionActive) {
+      loadActivityLogs();
+    }
+  }, [selectedDate, isExtensionActive]);
+
+  // Filter logs when filters change
+  useEffect(() => {
+    filterLogs();
+  }, [activityLogs, productiveFilter, searchQuery, selectedDate, view]);
 
   // Get empty chart data structure for Recharts
   const getChartData = () => {
@@ -267,15 +438,18 @@ const App = () => {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box sx={{ 
+      <Box sx={{
     fontFamily: 'Arial, sans-serif',
     backgroundColor: '#f8fdff',
-    minHeight: '100vh',
+        width: '450px',
+        height: '600px',
     display: 'flex',
     flexDirection: 'column',
         justifyContent: 'space-between',
+        overflow: 'hidden',
+        position: 'relative',
       }}>
-        {/* Header with Title and Menu */}
+        {/* Header with Title, Toggle, and Menu */}
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -284,7 +458,17 @@ const App = () => {
           px: 2,
           py: 1
         }}>
-          <Box sx={{ flex: 1 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Switch
+              checked={isExtensionActive}
+              onChange={(e) => setIsExtensionActive(e.target.checked)}
+              color="primary"
+              size="small"
+            />
+            <Typography variant="body2" color="text.secondary">
+              {isExtensionActive ? 'Active' : 'Inactive'}
+            </Typography>
+          </Box>
           <Typography 
             variant="h3" 
             component="h1" 
@@ -298,7 +482,7 @@ const App = () => {
           >
             Productivv
           </Typography>
-          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <button
               onClick={(event) => setAnchorEl(event.currentTarget)}
               style={{
@@ -345,7 +529,13 @@ const App = () => {
         </Box>
 
         {/* Conditional Rendering Based on Active Tab */}
-        <Box sx={{ flex: 1, p: 2 }}>
+        <Box sx={{ 
+          flex: 1, 
+          p: 2, 
+          overflow: 'auto',
+          opacity: isExtensionActive ? 1 : 0.5,
+          transition: 'opacity 0.3s ease'
+        }}>
           {activeTab === 'Home' && (
             <>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -431,7 +621,7 @@ const App = () => {
               </Box>
 
               {/* Chart Section */}
-              <Card sx={{ maxWidth: 600, mx: 'auto', mb: 2 }}>
+              <Card sx={{ maxWidth: 400, mx: 'auto', mb: 2 }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6" component="div" color="text.primary">
@@ -489,58 +679,79 @@ const App = () => {
 
           {activeTab === 'Logs' && (
             <Box>
-              <Typography variant="h5" component="h2" color="text.primary" sx={{ mb: 3, fontWeight: 600 }}>
+              <Typography variant="h5" component="h2" color="text.primary" sx={{ mb: 2, fontWeight: 600 }}>
                 Activity Logs
               </Typography>
-              <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
-                <Table sx={{ minWidth: 650 }} aria-label="activity logs table">
+              
+              {/* Search and Filter Controls */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  placeholder="Search logs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  size="small"
+                  sx={{ minWidth: 150, flex: 1 }}
+                />
+                <FilterToggle
+                  value={productiveFilter}
+                  exclusive
+                  onChange={handleProductiveFilterChange}
+                  size="small"
+                >
+                  <FilterButton value="all">All</FilterButton>
+                  <FilterButton value="productive">Productive</FilterButton>
+                  <FilterButton value="unproductive">Unproductive</FilterButton>
+                </FilterToggle>
+              </Box>
+
+              <TableContainer component={Paper} sx={{ boxShadow: 2, maxHeight: 300 }}>
+                <Table stickyHeader aria-label="activity logs table">
                   <TableHead>
-                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                      <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>URL</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Productive</TableCell>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>Title</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 100 }}>URL</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Duration</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 100 }}>Productive</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {/* Sample data - in real app this would come from state */}
-                    <TableRow>
-                      <TableCell>GitHub - Repository</TableCell>
-                      <TableCell>github.com/user/repo</TableCell>
-                      <TableCell>2h 15m</TableCell>
-                      <TableCell>Sep 24, 2024</TableCell>
-                      <TableCell>
-                        <Checkbox checked={true} color="primary" />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>YouTube - Video</TableCell>
-                      <TableCell>youtube.com/watch</TableCell>
-                      <TableCell>45m</TableCell>
-                      <TableCell>Sep 24, 2024</TableCell>
-                      <TableCell>
-                        <Checkbox checked={false} color="primary" />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Stack Overflow</TableCell>
-                      <TableCell>stackoverflow.com/question</TableCell>
-                      <TableCell>1h 30m</TableCell>
-                      <TableCell>Sep 23, 2024</TableCell>
-                      <TableCell>
-                        <Checkbox checked={true} color="primary" />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Reddit - Discussion</TableCell>
-                      <TableCell>reddit.com/r/programming</TableCell>
-                      <TableCell>20m</TableCell>
-                      <TableCell>Sep 23, 2024</TableCell>
-                      <TableCell>
-                        <Checkbox checked={false} color="primary" />
-                      </TableCell>
-                    </TableRow>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          <Typography color="text.secondary">Loading...</Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredLogs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          <Typography color="text.secondary">
+                            {isExtensionActive ? 'No logs found' : 'Extension is inactive'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredLogs.map((log, index) => (
+                        <TableRow key={log.id}>
+                          <TableCell sx={{ fontSize: '0.875rem' }}>{log.title}</TableCell>
+                          <TableCell sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
+                            {log.url}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.875rem' }}>{log.duration}</TableCell>
+                          <TableCell sx={{ fontSize: '0.875rem' }}>
+                            {new Date(log.date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Checkbox 
+                              checked={log.productive} 
+                              onChange={() => handleCheckboxChange(index)}
+                              color="primary"
+                              size="small"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -573,119 +784,165 @@ const App = () => {
 
               {/* Search Bar */}
               <Box sx={{ mb: 3 }}>
-                <FormControl fullWidth>
-                  <InputLabel htmlFor="settings-search">Search for a setting...</InputLabel>
-                  <Select
-                    id="settings-search"
-                    value=""
-                    startAdornment={<Search sx={{ mr: 1, color: 'text.secondary' }} />}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: '#f5f5f5',
-                        '& fieldset': {
-                          borderColor: '#e0e0e0',
-                        },
-                        '&:hover fieldset': {
-                          borderColor: '#bdbdbd',
-                        },
-                        '&.Mui-focused fieldset': {
-                          borderColor: '#0988b1',
-                        },
+                <TextField
+                  fullWidth
+                  placeholder="Search for a setting..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: '#f5f5f5',
+                      '& fieldset': {
+                        borderColor: '#e0e0e0',
                       },
-                    }}
-                  >
-                    <MenuItem disabled>Search for a setting...</MenuItem>
-                  </Select>
-                </FormControl>
+                      '&:hover fieldset': {
+                        borderColor: '#bdbdbd',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#0988b1',
+                      },
+                    },
+                  }}
+                />
               </Box>
 
-              {/* Settings List */}
-              <Paper sx={{ boxShadow: 1 }}>
-                <List>
-                  <ListItem disablePadding>
-                    <ListItemButton sx={{ py: 2, px: 2 }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Person color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary="Account" 
-                        primaryTypographyProps={{ fontWeight: 500 }}
+              {/* Settings Accordions */}
+              <Box sx={{ '& .MuiAccordion-root': { boxShadow: 1, mb: 1 } }}>
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Person color="primary" />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        Account
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <TextField
+                        label="Email"
+                        defaultValue="user@example.com"
+                        size="small"
+                        disabled
                       />
-                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
-                    </ListItemButton>
-                  </ListItem>
-                  <Divider sx={{ opacity: 0.3 }} />
-                  
-                  <ListItem disablePadding>
-                    <ListItemButton sx={{ py: 2, px: 2 }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Notifications color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary="Notifications" 
-                        primaryTypographyProps={{ fontWeight: 500 }}
+                      <TextField
+                        label="Display Name"
+                        defaultValue="Productivv User"
+                        size="small"
                       />
-                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
-                    </ListItemButton>
-                  </ListItem>
-                  <Divider sx={{ opacity: 0.3 }} />
-                  
-                  <ListItem disablePadding>
-                    <ListItemButton sx={{ py: 2, px: 2 }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Visibility color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary="Appearance" 
-                        primaryTypographyProps={{ fontWeight: 500 }}
-                      />
-                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
-                    </ListItemButton>
-                  </ListItem>
-                  <Divider sx={{ opacity: 0.3 }} />
-                  
-                  <ListItem disablePadding>
-                    <ListItemButton sx={{ py: 2, px: 2 }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Security color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary="Privacy & Security" 
-                        primaryTypographyProps={{ fontWeight: 500 }}
-                      />
-                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
-                    </ListItemButton>
-                  </ListItem>
-                  <Divider sx={{ opacity: 0.3 }} />
-                  
-                  <ListItem disablePadding>
-                    <ListItemButton sx={{ py: 2, px: 2 }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Help color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary="Help and Support" 
-                        primaryTypographyProps={{ fontWeight: 500 }}
-                      />
-                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
-                    </ListItemButton>
-                  </ListItem>
-                  <Divider sx={{ opacity: 0.3 }} />
-                  
-                  <ListItem disablePadding>
-                    <ListItemButton sx={{ py: 2, px: 2 }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Info color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary="About" 
-                        primaryTypographyProps={{ fontWeight: 500 }}
-                      />
-                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
-                    </ListItemButton>
-                  </ListItem>
-                </List>
-              </Paper>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Notifications color="primary" />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        Notifications
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2">Email Alerts</Typography>
+                        <Switch size="small" defaultChecked />
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2">Desktop Notifications</Typography>
+                        <Switch size="small" />
+                      </Box>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Visibility color="primary" />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        Appearance
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <FormControl size="small">
+                        <InputLabel>Theme</InputLabel>
+                        <Select defaultValue="light" label="Theme">
+                          <MenuItem value="light">Light</MenuItem>
+                          <MenuItem value="dark">Dark</MenuItem>
+                          <MenuItem value="auto">Auto</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Security color="primary" />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        Privacy & Security
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2">Data Collection</Typography>
+                        <Switch size="small" defaultChecked />
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2">Analytics</Typography>
+                        <Switch size="small" />
+                      </Box>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Help color="primary" />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        Help and Support
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Need help? Contact us at support@productivv.com
+                      </Typography>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Info color="primary" />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        About
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Typography variant="body2">Productivv v1.0.0</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Productivity tracking extension
+                      </Typography>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+              </Box>
             </Box>
           )}
         </Box>
@@ -695,10 +952,8 @@ const App = () => {
     display: 'flex',
     justifyContent: 'space-around',
     backgroundColor: '#ffffff',
-          p: 1,
+          p: 0.5,
     borderTop: '1px solid #ddd',
-    position: 'fixed',
-    bottom: 0,
     width: '100%',
         }}>
           <button
@@ -706,54 +961,54 @@ const App = () => {
               flex: 1,
               background: 'none',
               border: 'none',
-              fontSize: '1rem',
+              fontSize: '0.875rem',
               cursor: 'pointer',
               color: activeTab === 'Home' ? '#0988b1' : '#777',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              padding: '10px 0',
+              padding: '6px 0',
               fontWeight: activeTab === 'Home' ? 'bold' : 'normal',
             }}
             onClick={() => setActiveTab('Home')}
           >
-            <FaHome /> <span>Home</span>
+            <FaHome size={16} /> <span style={{ fontSize: '0.75rem' }}>Home</span>
           </button>
           <button
             style={{
     flex: 1,
     background: 'none',
     border: 'none',
-    fontSize: '1rem',
+    fontSize: '0.875rem',
     cursor: 'pointer',
               color: activeTab === 'Logs' ? '#0988b1' : '#777',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '10px 0',
+    padding: '6px 0',
               fontWeight: activeTab === 'Logs' ? 'bold' : 'normal',
             }}
             onClick={() => setActiveTab('Logs')}
           >
-            <FaClock /> <span>Logs</span>
+            <FaClock size={16} /> <span style={{ fontSize: '0.75rem' }}>Logs</span>
           </button>
           <button
             style={{
     flex: 1,
     background: 'none',
     border: 'none',
-    fontSize: '1rem',
+    fontSize: '0.875rem',
     cursor: 'pointer',
               color: activeTab === 'Settings' ? '#0988b1' : '#777',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '10px 0',
+    padding: '6px 0',
               fontWeight: activeTab === 'Settings' ? 'bold' : 'normal',
             }}
             onClick={() => setActiveTab('Settings')}
           >
-            <FaCog /> <span>Settings</span>
+            <FaCog size={16} /> <span style={{ fontSize: '0.75rem' }}>Settings</span>
           </button>
         </Box>
       </Box>
