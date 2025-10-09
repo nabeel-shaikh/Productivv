@@ -14,9 +14,35 @@ import {
   CardContent,
   Typography,
   Box,
-  Chip
+  Chip,
+  Divider,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Checkbox,
+  List,
+  ListItem,
+  ListItemButton
 } from '@mui/material';
-import { KeyboardArrowDown } from '@mui/icons-material';
+import { 
+  KeyboardArrowDown, 
+  MoreVert, 
+  Person, 
+  Notifications, 
+  Visibility, 
+  Security, 
+  Help, 
+  Info,
+  Search,
+  ArrowBack
+} from '@mui/icons-material';
 
 /*
  * Productivv - Dynamic Time Tracking App
@@ -106,9 +132,16 @@ const theme = createTheme({
     background: {
       default: '#f8fdff',
     },
+    text: {
+      primary: '#2c3e50', // Darker grey instead of black
+    },
   },
   typography: {
-    fontFamily: 'Arial, sans-serif',
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    h3: {
+      fontWeight: 600,
+      color: '#2c3e50',
+    },
   },
 });
 
@@ -118,7 +151,7 @@ const App = () => {
 
   // State to track the selected view (Day/Week) on Home tab
   const [view, setView] = useState('Week');
-  
+
   // State for time tracking data
   const [timeData, setTimeData] = useState({});
   
@@ -127,6 +160,10 @@ const App = () => {
   
   // Current date for reference - Set to September 24th, 2024 for demo
   const [currentDate] = useState(new Date('2024-09-24'));
+  
+  // State for menu
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
   
   // Data persistence functions
   const saveTimeData = (data) => {
@@ -231,18 +268,80 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <Box sx={{ 
-        fontFamily: 'Arial, sans-serif',
-        backgroundColor: '#f8fdff',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
+    fontFamily: 'Arial, sans-serif',
+    backgroundColor: '#f8fdff',
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
         justifyContent: 'space-between',
       }}>
-        {/* Title */}
-        <Box sx={{ textAlign: 'center', mb: 2 }}>
-          <Typography variant="h3" component="h1" color="text.primary" sx={{ m: 0 }}>
+        {/* Header with Title and Menu */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 2,
+          px: 2,
+          py: 1
+        }}>
+          <Box sx={{ flex: 1 }} />
+          <Typography 
+            variant="h3" 
+            component="h1" 
+            color="text.primary" 
+            sx={{ 
+              m: 0,
+              fontWeight: 600,
+              color: '#2c3e50',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+            }}
+          >
             Productivv
           </Typography>
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={(event) => setAnchorEl(event.currentTarget)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#2c3e50'
+              }}
+            >
+              <MoreVert />
+            </button>
+            <Menu
+              anchorEl={anchorEl}
+              open={open}
+              onClose={() => setAnchorEl(null)}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+            >
+              <MenuItem onClick={() => { setActiveTab('Home'); setAnchorEl(null); }}>
+                <ListItemIcon><FaHome /></ListItemIcon>
+                <ListItemText>Home</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setActiveTab('Logs'); setAnchorEl(null); }}>
+                <ListItemIcon><FaClock /></ListItemIcon>
+                <ListItemText>Logs</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setActiveTab('Settings'); setAnchorEl(null); }}>
+                <ListItemIcon><FaCog /></ListItemIcon>
+                <ListItemText>Settings</ListItemText>
+              </MenuItem>
+            </Menu>
+          </Box>
         </Box>
 
         {/* Conditional Rendering Based on Active Tab */}
@@ -332,7 +431,7 @@ const App = () => {
               </Box>
 
               {/* Chart Section */}
-              <Card sx={{ maxWidth: 400, mx: 'auto', mb: 2 }}>
+              <Card sx={{ maxWidth: 600, mx: 'auto', mb: 2 }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6" component="div" color="text.primary">
@@ -389,28 +488,218 @@ const App = () => {
           )}
 
           {activeTab === 'Logs' && (
-            <Typography variant="h6" color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
-              Previous Logs (Coming Soon)
-            </Typography>
+            <Box>
+              <Typography variant="h5" component="h2" color="text.primary" sx={{ mb: 3, fontWeight: 600 }}>
+                Activity Logs
+              </Typography>
+              <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
+                <Table sx={{ minWidth: 650 }} aria-label="activity logs table">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>URL</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Productive</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {/* Sample data - in real app this would come from state */}
+                    <TableRow>
+                      <TableCell>GitHub - Repository</TableCell>
+                      <TableCell>github.com/user/repo</TableCell>
+                      <TableCell>2h 15m</TableCell>
+                      <TableCell>Sep 24, 2024</TableCell>
+                      <TableCell>
+                        <Checkbox checked={true} color="primary" />
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>YouTube - Video</TableCell>
+                      <TableCell>youtube.com/watch</TableCell>
+                      <TableCell>45m</TableCell>
+                      <TableCell>Sep 24, 2024</TableCell>
+                      <TableCell>
+                        <Checkbox checked={false} color="primary" />
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Stack Overflow</TableCell>
+                      <TableCell>stackoverflow.com/question</TableCell>
+                      <TableCell>1h 30m</TableCell>
+                      <TableCell>Sep 23, 2024</TableCell>
+                      <TableCell>
+                        <Checkbox checked={true} color="primary" />
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Reddit - Discussion</TableCell>
+                      <TableCell>reddit.com/r/programming</TableCell>
+                      <TableCell>20m</TableCell>
+                      <TableCell>Sep 23, 2024</TableCell>
+                      <TableCell>
+                        <Checkbox checked={false} color="primary" />
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
           )}
 
           {activeTab === 'Settings' && (
-            <Typography variant="h6" color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
-              Settings (Coming Soon)
-            </Typography>
+            <Box>
+              {/* Settings Header */}
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <button
+                  onClick={() => setActiveTab('Home')}
+                  style={{
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+                    padding: '8px',
+                    marginRight: '16px',
+    display: 'flex',
+    alignItems: 'center',
+                    color: '#2c3e50'
+                  }}
+                >
+                  <ArrowBack />
+                </button>
+                <Typography variant="h5" component="h2" color="text.primary" sx={{ fontWeight: 600 }}>
+                  Settings
+                </Typography>
+              </Box>
+
+              {/* Search Bar */}
+              <Box sx={{ mb: 3 }}>
+                <FormControl fullWidth>
+                  <InputLabel htmlFor="settings-search">Search for a setting...</InputLabel>
+                  <Select
+                    id="settings-search"
+                    value=""
+                    startAdornment={<Search sx={{ mr: 1, color: 'text.secondary' }} />}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#f5f5f5',
+                        '& fieldset': {
+                          borderColor: '#e0e0e0',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#bdbdbd',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#0988b1',
+                        },
+                      },
+                    }}
+                  >
+                    <MenuItem disabled>Search for a setting...</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {/* Settings List */}
+              <Paper sx={{ boxShadow: 1 }}>
+                <List>
+                  <ListItem disablePadding>
+                    <ListItemButton sx={{ py: 2, px: 2 }}>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Person color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="Account" 
+                        primaryTypographyProps={{ fontWeight: 500 }}
+                      />
+                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ opacity: 0.3 }} />
+                  
+                  <ListItem disablePadding>
+                    <ListItemButton sx={{ py: 2, px: 2 }}>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Notifications color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="Notifications" 
+                        primaryTypographyProps={{ fontWeight: 500 }}
+                      />
+                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ opacity: 0.3 }} />
+                  
+                  <ListItem disablePadding>
+                    <ListItemButton sx={{ py: 2, px: 2 }}>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Visibility color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="Appearance" 
+                        primaryTypographyProps={{ fontWeight: 500 }}
+                      />
+                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ opacity: 0.3 }} />
+                  
+                  <ListItem disablePadding>
+                    <ListItemButton sx={{ py: 2, px: 2 }}>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Security color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="Privacy & Security" 
+                        primaryTypographyProps={{ fontWeight: 500 }}
+                      />
+                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ opacity: 0.3 }} />
+                  
+                  <ListItem disablePadding>
+                    <ListItemButton sx={{ py: 2, px: 2 }}>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Help color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="Help and Support" 
+                        primaryTypographyProps={{ fontWeight: 500 }}
+                      />
+                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ opacity: 0.3 }} />
+                  
+                  <ListItem disablePadding>
+                    <ListItemButton sx={{ py: 2, px: 2 }}>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Info color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="About" 
+                        primaryTypographyProps={{ fontWeight: 500 }}
+                      />
+                      <KeyboardArrowDown sx={{ color: 'text.secondary' }} />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Paper>
+            </Box>
           )}
         </Box>
 
         {/* Bottom Navigation */}
         <Box sx={{
-          display: 'flex',
-          justifyContent: 'space-around',
-          backgroundColor: '#ffffff',
+    display: 'flex',
+    justifyContent: 'space-around',
+    backgroundColor: '#ffffff',
           p: 1,
-          borderTop: '1px solid #ddd',
-          position: 'fixed',
-          bottom: 0,
-          width: '100%',
+    borderTop: '1px solid #ddd',
+    position: 'fixed',
+    bottom: 0,
+    width: '100%',
         }}>
           <button
             style={{
@@ -432,16 +721,16 @@ const App = () => {
           </button>
           <button
             style={{
-              flex: 1,
-              background: 'none',
-              border: 'none',
-              fontSize: '1rem',
-              cursor: 'pointer',
+    flex: 1,
+    background: 'none',
+    border: 'none',
+    fontSize: '1rem',
+    cursor: 'pointer',
               color: activeTab === 'Logs' ? '#0988b1' : '#777',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '10px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '10px 0',
               fontWeight: activeTab === 'Logs' ? 'bold' : 'normal',
             }}
             onClick={() => setActiveTab('Logs')}
@@ -450,16 +739,16 @@ const App = () => {
           </button>
           <button
             style={{
-              flex: 1,
-              background: 'none',
-              border: 'none',
-              fontSize: '1rem',
-              cursor: 'pointer',
+    flex: 1,
+    background: 'none',
+    border: 'none',
+    fontSize: '1rem',
+    cursor: 'pointer',
               color: activeTab === 'Settings' ? '#0988b1' : '#777',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '10px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '10px 0',
               fontWeight: activeTab === 'Settings' ? 'bold' : 'normal',
             }}
             onClick={() => setActiveTab('Settings')}
