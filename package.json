@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "dotenv": "^17.2.3",
+    "exrpess": "^0.0.1-security",
+    "mongoose": "^8.19.1",
     "react-icons": "^5.4.0"
   }
 }

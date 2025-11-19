@@ -178,22 +178,62 @@ const getMockActivityLogs = () => [
   }
 ];
 
-// API connection placeholder
+// API connection
 const fetchLogsFromMongo = async (dateRange) => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`/api/logs?dateRange=${dateRange}`);
-    // const data = await response.json();
-    // return data;
+    let url = 'http://localhost:5000/api/activity';
+    // Append query params if dateRange is provided (simplification)
+    if (dateRange && dateRange !== 'all') {
+      // Logic to parse dateRange string into start/end dates can be added here
+      // For now, we fetch all and filter on frontend, or backend handles query params
+      // url += \`?range=\${dateRange}\`; 
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network response was not ok');
+    const data = await response.json();
     
-    // For now, return mock data
-    console.log('Fetching logs for date range:', dateRange);
-    return getMockActivityLogs();
+    // Map backend data to frontend format if necessary
+    // Backend: { url, title, duration, timestamp, productivity, category }
+    // Frontend expects: { id, title, url, duration (formatted?), date, productive, timestamp }
+    
+    return data.map((item, index) => ({
+      id: item._id || index,
+      title: item.title || 'No Title',
+      url: item.url,
+      duration: formatDuration(item.duration), // Helper needed?
+      rawDuration: item.duration,
+      date: new Date(item.timestamp).toISOString().split('T')[0],
+      productive: item.productivity === 'productive',
+      timestamp: new Date(item.timestamp),
+      category: item.category
+    }));
+
   } catch (error) {
     console.error('Error fetching logs:', error);
-    return getMockActivityLogs(); // Fallback to mock data
+    return []; // Return empty array on error instead of mock
   }
 };
+
+const formatDuration = (seconds) => {
+  if (!seconds) return '0m';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+};
+
+const fetchStatsFromBackend = async () => {
+  try {
+    const response = await fetch('http://localhost:5000/api/stats');
+    if (!response.ok) throw new Error('Network response was not ok');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    return [];
+  }
+};
+
 
 // Create Material-UI theme
 const theme = createTheme({
@@ -259,6 +299,7 @@ const App = () => {
   // New state variables for functionality
   const [isExtensionActive, setIsExtensionActive] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
+  const [stats, setStats] = useState([]); // New stats state
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [productiveFilter, setProductiveFilter] = useState('all'); // 'all', 'productive', 'unproductive'
   const [searchQuery, setSearchQuery] = useState('');
@@ -369,13 +410,17 @@ const App = () => {
     try {
       const logs = await fetchLogsFromMongo(selectedDate || 'all');
       setActivityLogs(logs);
+
+      const backendStats = await fetchStatsFromBackend();
+      setStats(backendStats);
     } catch (error) {
       console.error('Error loading activity logs:', error);
-      setActivityLogs(getMockActivityLogs());
+      setActivityLogs([]);
     } finally {
       setLoading(false);
     }
   };
+
 
   // Initialize data and selected date
   useEffect(() => {
@@ -404,24 +449,34 @@ const App = () => {
     filterLogs();
   }, [activityLogs, productiveFilter, searchQuery, selectedDate, view]);
 
-  // Get empty chart data structure for Recharts
+  // Get chart data for Recharts
   const getChartData = () => {
     if (view === 'Week') {
-      // Return empty data structure for week view
-      return [
-        { day: 'S', productive: 0, neutral: 0, unproductive: 0, total: 0 },
-        { day: 'M', productive: 0, neutral: 0, unproductive: 0, total: 0 },
-        { day: 'T', productive: 0, neutral: 0, unproductive: 0, total: 0 },
-        { day: 'W', productive: 0, neutral: 0, unproductive: 0, total: 0 },
-        { day: 'T', productive: 0, neutral: 0, unproductive: 0, total: 0 },
-        { day: 'F', productive: 0, neutral: 0, unproductive: 0, total: 0 },
-        { day: 'S', productive: 0, neutral: 0, unproductive: 0, total: 0 }
-      ];
+      const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+      const data = days.map(d => ({ day: d, productive: 0, neutral: 0, unproductive: 0, total: 0 }));
+      
+      // Aggregate from filtered logs
+      filteredLogs.forEach(log => {
+        if (!log.timestamp) return;
+        const dayIndex = log.timestamp.getDay();
+        const durationHours = (log.rawDuration || 0) / 3600;
+        
+        if (log.productive) data[dayIndex].productive += durationHours;
+        else data[dayIndex].unproductive += durationHours;
+        
+        data[dayIndex].total += durationHours;
+      });
+      return data;
     } else {
-      // Return empty data structure for day view
-      return [
-        { day: 'T', productive: 0, neutral: 0, unproductive: 0, total: 0 }
-      ];
+      // Day view
+      const data = [{ day: 'Today', productive: 0, neutral: 0, unproductive: 0, total: 0 }];
+      filteredLogs.forEach(log => {
+        const durationHours = (log.rawDuration || 0) / 3600;
+        if (log.productive) data[0].productive += durationHours;
+        else data[0].unproductive += durationHours;
+        data[0].total += durationHours;
+      });
+      return data;
     }
   };
 
@@ -433,8 +488,10 @@ const App = () => {
   };
 
   const chartData = getChartData();
-  const totalTime = 0; // No data initially
-  const percentageChange = 0; // No comparison initially
+  
+  // Calculate total time from filtered logs
+  const totalTime = filteredLogs.reduce((acc, log) => acc + ((log.rawDuration || 0) / 3600), 0);
+  const percentageChange = 0; // Placeholder for comparison logic
 
   return (
     <ThemeProvider theme={theme}>

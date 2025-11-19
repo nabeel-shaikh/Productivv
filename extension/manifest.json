@@ -3,7 +3,24 @@
     "name": "Productivv",
     "version": "1.0",
     "description": "Browser extension to track productivity and time usage.",
-    "permissions": ["tabs", "storage", "activeTab"],
+    "permissions": [
+      "tabs", 
+      "storage", 
+      "activeTab",
+      "scripting"
+    ],
+    "host_permissions": [
+      "http://localhost:5000/*"
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["content.js"]
+      }
+    ],
     "action": {
       "default_popup": "popup/popup.html",
       "default_icon": "assets/icon.png"
@@ -13,5 +30,4 @@
       "48": "assets/icon.png",
       "128": "assets/icon.png"
     }
-  }
-  
+}
