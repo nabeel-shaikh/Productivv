@@ -8,6 +8,7 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.js',
   },
+  devtool: 'cheap-module-source-map', // Enable source maps for debugging
   module: {
     rules: [
       {
@@ -25,6 +26,11 @@ module.exports = {
   },
   resolve: {
     extensions: ['.js', '.jsx'],
+  },
+  performance: {
+    hints: false, // Disable performance hints (warnings about file size)
+    maxEntrypointSize: 512000,
+    maxAssetSize: 512000
   },
   plugins: [
     new HtmlWebpackPlugin({

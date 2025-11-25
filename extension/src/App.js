@@ -181,7 +181,7 @@ const getMockActivityLogs = () => [
 // API connection
 const fetchLogsFromMongo = async (dateRange) => {
   try {
-    let url = 'http://localhost:5000/api/activity';
+    let url = 'http://localhost:5001/api/activity';
     // Append query params if dateRange is provided (simplification)
     if (dateRange && dateRange !== 'all') {
       // Logic to parse dateRange string into start/end dates can be added here
@@ -225,7 +225,7 @@ const formatDuration = (seconds) => {
 
 const fetchStatsFromBackend = async () => {
   try {
-    const response = await fetch('http://localhost:5000/api/stats');
+    const response = await fetch('http://localhost:5001/api/stats');
     if (!response.ok) throw new Error('Network response was not ok');
     return await response.json();
   } catch (error) {
@@ -431,9 +431,11 @@ const App = () => {
     // Set initial selected date based on current view
     if (view === 'Week') {
       const { startOfWeek, endOfWeek } = getWeekDates(currentDate);
-      setSelectedDate(formatDateRange(startOfWeek, endOfWeek));
+      // Use the same value format as getWeekOptions
+      setSelectedDate(`${startOfWeek.toISOString().split('T')[0]}_${endOfWeek.toISOString().split('T')[0]}`);
     } else {
-      setSelectedDate(formatDate(currentDate));
+      // Use ISO date format for Day view
+      setSelectedDate(currentDate.toISOString().split('T')[0]);
     }
   }, [view, currentDate]);
 
@@ -662,13 +664,13 @@ const App = () => {
                   >
                     {view === 'Week' ? (
                       getWeekOptions(currentDate).map((option, index) => (
-                        <MenuItem key={index} value={option.label}>
+                        <MenuItem key={index} value={option.value}>
                           {option.label}
                         </MenuItem>
                       ))
                     ) : (
                       getDayOptions(currentDate).map((option, index) => (
-                        <MenuItem key={index} value={option.label}>
+                        <MenuItem key={index} value={option.value}>
                           {option.label}
                         </MenuItem>
                       ))

@@ -33,7 +33,7 @@ async function logActivity(url, title, duration, startTimeStr) {
   console.log('Sending log to backend:', log);
 
   try {
-    await fetch("http://localhost:5000/api/activity", {
+    await fetch("http://localhost:5001/api/activity", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
