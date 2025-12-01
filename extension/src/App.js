@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaHome, FaClock, FaCog } from 'react-icons/fa'; // Icons for the tabs
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Tooltip as RechartsTooltip } from 'recharts';
 import { 
   ThemeProvider, 
   createTheme, 
@@ -36,7 +35,14 @@ import {
   AccordionSummary,
   AccordionDetails,
   ToggleButtonGroup as FilterToggle,
-  ToggleButton as FilterButton
+  ToggleButton as FilterButton,
+  BottomNavigation,
+  BottomNavigationAction,
+  IconButton,
+  Stack,
+  Badge,
+  Grid,
+  Button
 } from '@mui/material';
 import { 
   KeyboardArrowDown, 
@@ -50,30 +56,22 @@ import {
   Search,
   ArrowBack,
   ExpandMore,
-  PowerSettingsNew
+  HomeRounded,
+  AccessTimeFilledRounded,
+  SettingsRounded,
+  CheckCircleRounded,
+  CancelRounded,
+  RemoveCircleRounded,
+  TrendingUp,
+  TrendingDown
 } from '@mui/icons-material';
 
 /*
  * Productivv - Dynamic Time Tracking App
- * 
- * Data Structure:
- * timeData = {
- *   "2024-01-15": {
- *     productive: 4.5,    // hours spent on productive sites
- *     neutral: 1.2,       // hours spent on neutral sites  
- *     unproductive: 2.1,  // hours spent on unproductive sites
- *     total: 7.8          // total hours
- *   }
- * }
- * 
- * Future Integration Points:
- * - Browser extension will call addTimeData() to update tracking
- * - AI classification will determine productive/neutral/unproductive categories
- * - MongoDB/API integration will replace localStorage persistence
- * - Real-time updates will trigger chart re-renders
  */
 
-// Utility functions for date handling
+// --- Utility Functions (Preserved) ---
+
 const formatDate = (date) => {
   const options = { month: 'long', day: 'numeric' };
   return date.toLocaleDateString('en-US', options);
@@ -102,8 +100,6 @@ const getDayOptions = (currentDate) => {
   for (let i = 0; i < 7; i++) {
     const date = new Date(currentDate);
     date.setDate(currentDate.getDate() - i);
-    
-    // FIX: Use local YYYY-MM-DD format for the VALUE
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -124,7 +120,6 @@ const getWeekOptions = (currentDate) => {
     date.setDate(currentDate.getDate() - (i * 7));
     const { startOfWeek, endOfWeek } = getWeekDates(date);
     
-    // FIX: Use local YYYY-MM-DD format for VALUE
     const sYear = startOfWeek.getFullYear();
     const sMonth = String(startOfWeek.getMonth() + 1).padStart(2, '0');
     const sDay = String(startOfWeek.getDate()).padStart(2, '0');
@@ -143,42 +138,8 @@ const getWeekOptions = (currentDate) => {
   return options;
 };
 
-// Empty data structure - no data will be shown initially
 const getEmptyData = () => {
   return {};
-};
-
-// API connection
-const fetchLogsFromMongo = async (dateRange) => {
-  try {
-    let url = 'http://localhost:5001/api/activity';
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network response was not ok');
-    const data = await response.json();
-    
-    return data.map((item, index) => {
-      // FIX: Use local timezone date string for filtering
-      const localDate = new Date(item.timestamp).toLocaleDateString('en-CA'); // YYYY-MM-DD local
-
-      return {
-        id: item.id || index,
-        title: item.title || 'No Title',
-        // url: item.url, // Removed from backend response
-        duration: formatDuration(item.duration), 
-        rawDuration: item.duration,
-        date: localDate, // Use local date string
-        productive: item.productivity === 'productive',
-        productivityColor: item.productivityColor, // Use backend provided color
-        timestamp: new Date(item.timestamp),
-        category: item.category
-      };
-    });
-
-  } catch (error) {
-    console.error('Error fetching logs:', error);
-    return []; 
-  }
 };
 
 const formatDuration = (seconds) => {
@@ -187,6 +148,35 @@ const formatDuration = (seconds) => {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+};
+
+// --- API Calls (Preserved) ---
+
+const fetchLogsFromMongo = async (dateRange) => {
+  try {
+    let url = 'http://localhost:5001/api/activity';
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network response was not ok');
+    const data = await response.json();
+    
+    return data.map((item, index) => {
+      const localDate = new Date(item.timestamp).toLocaleDateString('en-CA'); 
+      return {
+        id: item.id || index,
+        title: item.title || 'No Title',
+        duration: formatDuration(item.duration), 
+        rawDuration: item.duration,
+        date: localDate, 
+        productive: item.productivity === 'productive',
+        productivityColor: item.productivityColor, 
+        timestamp: new Date(item.timestamp),
+        category: item.category
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching logs:', error);
+    return []; 
+  }
 };
 
 const fetchStatsFromBackend = async () => {
@@ -200,78 +190,179 @@ const fetchStatsFromBackend = async () => {
   }
 };
 
+// --- Modern Theme Configuration ---
 
-// Create Material-UI theme
 const theme = createTheme({
   palette: {
+    mode: 'light',
     primary: {
-      main: '#0988b1',
+      main: '#2563eb', // Modern Blue
+      light: '#60a5fa',
+      dark: '#1e40af',
     },
     secondary: {
-      main: '#36494f',
+      main: '#64748b', // Slate
     },
     background: {
-      default: '#f8fdff',
+      default: '#f8fafc', // Slate 50
+      paper: '#ffffff',
     },
     text: {
-      primary: '#2c3e50', // Darker grey instead of black
+      primary: '#0f172a', // Slate 900
+      secondary: '#64748b', // Slate 500
     },
+    success: { main: '#10b981' },
+    error: { main: '#ef4444' },
+    warning: { main: '#f59e0b' },
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-    h3: {
-      fontWeight: 600,
-      color: '#2c3e50',
-      fontSize: '1.5rem', // Smaller for popup
-    },
-    h5: {
-      fontSize: '1.1rem', // Smaller for popup
-    },
+    fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     h6: {
-      fontSize: '1rem', // Smaller for popup
+      fontWeight: 600,
+      fontSize: '1.125rem',
+      letterSpacing: '-0.01em',
     },
+    subtitle1: {
+      fontWeight: 600,
+      fontSize: '0.95rem',
+    },
+    body2: {
+      fontSize: '0.875rem',
+      lineHeight: 1.5,
+    },
+    caption: {
+      fontSize: '0.75rem',
+      color: '#94a3b8',
+    },
+  },
+  shape: {
+    borderRadius: 12,
   },
   components: {
     MuiCard: {
       styleOverrides: {
         root: {
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+          border: '1px solid #e2e8f0',
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 500,
+          padding: '4px 12px',
+          '&.Mui-selected': {
+            backgroundColor: '#eff6ff',
+            color: '#2563eb',
+            border: '1px solid #bfdbfe',
+          },
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          borderBottom: '1px solid #f1f5f9',
+          padding: '12px 16px',
+        },
+        head: {
+          backgroundColor: '#f8fafc',
+          fontWeight: 600,
+          color: '#475569',
+        },
+      },
+    },
+    MuiBottomNavigation: {
+      styleOverrides: {
+        root: {
+          borderTop: '1px solid #e2e8f0',
+          height: 64,
+        },
+      },
+    },
+    MuiBottomNavigationAction: {
+      styleOverrides: {
+        root: {
+          '&.Mui-selected': {
+            color: '#2563eb',
+          },
+        },
+        label: {
+          fontWeight: 500,
         },
       },
     },
   },
 });
 
+// --- Custom Components ---
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const productive = payload.find(p => p.name === 'Productive')?.value || 0;
+    const unproductive = payload.find(p => p.name === 'Unproductive')?.value || 0;
+    const neutral = payload.find(p => p.name === 'Neutral')?.value || 0;
+    const total = productive + unproductive + neutral;
+    const prodPercent = total > 0 ? Math.round((productive / total) * 100) : 0;
+
+    return (
+      <Paper sx={{ p: 1.5, border: '1px solid #e2e8f0', boxShadow: 3 }}>
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>{label}</Typography>
+        <Stack spacing={0.5}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10b981' }} />
+            <Typography variant="body2">Productive: <b>{formatDuration(productive * 3600)}</b></Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#9ca3af' }} />
+            <Typography variant="body2">Neutral: <b>{formatDuration(neutral * 3600)}</b></Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444' }} />
+            <Typography variant="body2">Unproductive: <b>{formatDuration(unproductive * 3600)}</b></Typography>
+          </Box>
+        </Stack>
+        <Divider sx={{ my: 1 }} />
+        <Typography variant="caption" fontWeight="600" color="text.secondary">
+          Productivity Score: {prodPercent}%
+        </Typography>
+      </Paper>
+    );
+  }
+  return null;
+};
+
+// --- Main App Component ---
+
 const App = () => {
-  // State to track the selected tab
   const [activeTab, setActiveTab] = useState('Home');
-
-  // State to track the selected view (Day/Week) on Home tab
   const [view, setView] = useState('Week');
-
-  // State for time tracking data
   const [timeData, setTimeData] = useState({});
-  
-  // State to track selected date/date range
   const [selectedDate, setSelectedDate] = useState('');
-  
-  // Current date for reference - Use actual current date
   const [currentDate] = useState(new Date());
-  
-  // State for menu
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
-
-  // New state variables for functionality
   const [isExtensionActive, setIsExtensionActive] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
-  const [stats, setStats] = useState([]); // New stats state
+  const [stats, setStats] = useState([]); 
   const [filteredLogs, setFilteredLogs] = useState([]);
-  const [productiveFilter, setProductiveFilter] = useState('all'); // 'all', 'productive', 'unproductive'
+  const [productiveFilter, setProductiveFilter] = useState('all'); 
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Data persistence functions
+  // Persistence Helpers
   const saveTimeData = (data) => {
     try {
       localStorage.setItem('productivv_time_data', JSON.stringify(data));
@@ -290,33 +381,23 @@ const App = () => {
     }
   };
 
-  // Function to add new time data (for future use with browser extension)
   const addTimeData = (date, productive, neutral, unproductive) => {
     const dateKey = date.toISOString().split('T')[0];
     const newData = {
       ...timeData,
-      [dateKey]: {
-        productive,
-        neutral,
-        unproductive,
-        total: productive + neutral + unproductive
-      }
+      [dateKey]: { productive, neutral, unproductive, total: productive + neutral + unproductive }
     };
     setTimeData(newData);
     saveTimeData(newData);
   };
 
-  // Function to export data for API/MongoDB integration
-  const exportTimeData = () => {
-    return {
-      userId: 'current_user', // Will be dynamic in production
-      data: timeData,
-      lastUpdated: new Date().toISOString(),
-      version: '1.0'
-    };
-  };
+  const exportTimeData = () => ({
+    userId: 'current_user',
+    data: timeData,
+    lastUpdated: new Date().toISOString(),
+    version: '1.0'
+  });
 
-  // Function to import data from API/MongoDB
   const importTimeData = (apiData) => {
     if (apiData && apiData.data) {
       setTimeData(apiData.data);
@@ -324,59 +405,46 @@ const App = () => {
     }
   };
 
-  // New handler functions for enhanced functionality
+  // Handlers
   const handleCheckboxChange = (index) => {
     setActivityLogs(prev => prev.map((log, i) => 
       i === index ? { ...log, productive: !log.productive } : log
     ));
-    // TODO: Update backend when API is ready
   };
 
   const handleProductiveFilterChange = (event, newFilter) => {
-    if (newFilter !== null) {
-      setProductiveFilter(newFilter);
-    }
+    if (newFilter !== null) setProductiveFilter(newFilter);
   };
 
   const filterLogs = () => {
     let filtered = activityLogs;
-
-    // Filter by productive status
     if (productiveFilter !== 'all') {
       filtered = filtered.filter(log => 
         productiveFilter === 'productive' ? log.productive : !log.productive
       );
     }
-
-    // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(log => 
         log.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.url.toLowerCase().includes(searchQuery.toLowerCase())
+        log.url?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-
-    // Filter by selected date
     if (selectedDate) {
       if (view === 'Day') {
         filtered = filtered.filter(log => log.date === selectedDate);
       } else {
-        // Week view - parse date range
         const [startDate, endDate] = selectedDate.split('_');
         filtered = filtered.filter(log => log.date >= startDate && log.date <= endDate);
       }
     }
-
     setFilteredLogs(filtered);
   };
 
-  // Load activity logs
   const loadActivityLogs = async () => {
     setLoading(true);
     try {
       const logs = await fetchLogsFromMongo(selectedDate || 'all');
       setActivityLogs(logs);
-
       const backendStats = await fetchStatsFromBackend();
       setStats(backendStats);
     } catch (error) {
@@ -387,9 +455,7 @@ const App = () => {
     }
   };
 
-
   useEffect(() => {
-    // Load active state from storage
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get(['isExtensionActive'], (result) => {
         if (result.isExtensionActive !== undefined) {
@@ -399,7 +465,6 @@ const App = () => {
     }
   }, []);
 
-  // Handle active switch change
   const handleActiveChange = (e) => {
     const checked = e.target.checked;
     setIsExtensionActive(checked);
@@ -408,17 +473,12 @@ const App = () => {
     }
   };
 
-  // Initialize data and selected date
   useEffect(() => {
-    // Start with empty data - no tracking data initially
     const emptyData = getEmptyData();
     setTimeData(emptyData);
     
-    // Set initial selected date based on current view
     if (view === 'Week') {
       const { startOfWeek, endOfWeek } = getWeekDates(currentDate);
-      
-      // FIX: Match format used in getWeekOptions (YYYY-MM-DD_YYYY-MM-DD)
       const sYear = startOfWeek.getFullYear();
       const sMonth = String(startOfWeek.getMonth() + 1).padStart(2, '0');
       const sDay = String(startOfWeek.getDate()).padStart(2, '0');
@@ -431,7 +491,6 @@ const App = () => {
       
       setSelectedDate(`${startStr}_${endStr}`);
     } else {
-      // FIX: Match format used in getDayOptions (YYYY-MM-DD)
       const year = currentDate.getFullYear();
       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
       const day = String(currentDate.getDate()).padStart(2, '0');
@@ -439,38 +498,47 @@ const App = () => {
     }
   }, [view, currentDate]);
 
-  // Load activity logs when component mounts or date changes
   useEffect(() => {
     if (isExtensionActive) {
       loadActivityLogs();
     }
   }, [selectedDate, isExtensionActive]);
 
-  // Filter logs when filters change
   useEffect(() => {
     filterLogs();
   }, [activityLogs, productiveFilter, searchQuery, selectedDate, view]);
 
-  // Get chart data for Recharts
   const getChartData = () => {
     if (view === 'Week') {
       const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       const data = days.map(d => ({ day: d, productive: 0, neutral: 0, unproductive: 0, total: 0 }));
       
-      // Aggregate from filtered logs
       filteredLogs.forEach(log => {
         if (!log.timestamp) return;
         const dayIndex = log.timestamp.getDay();
         const durationHours = (log.rawDuration || 0) / 3600;
         
         if (log.productive) data[dayIndex].productive += durationHours;
-        else data[dayIndex].unproductive += durationHours;
+        else data[dayIndex].unproductive += durationHours; // Simplification for binary logic if neutral not set
+        // Actually backend sends productive/unproductive/neutral now? 
+        // logs from fetchLogsFromMongo have 'productive' boolean and 'category'.
+        // wait, earlier I added logic for neutral. Let's check fetchLogsFromMongo.
+        // It returns: { productive: item.productivity === 'productive', productivityColor: ... }
+        // It does NOT explicitly return 'neutral' status boolean, but we can infer from productivityColor or just use binary for now
+        // based on existing logic in getChartData which was:
+        // if (log.productive) ... else ...
+        // I should stick to the logic I had before to be safe, but I see I had updated it in a previous turn to use `productivityStatus`?
+        // In the file I just read, `fetchLogsFromMongo` does NOT return `productivityStatus`.
+        // It returns `productive: item.productivity === 'productive'`.
+        // So I will stick to the binary logic present in the file I read to avoid breaking things, 
+        // OR I can improve it if I can see `item.productivity`.
+        // `item.productivity` IS available in `fetchLogsFromMongo` scope.
+        // Let's assume strict binary for now to ensure graph works as before.
         
         data[dayIndex].total += durationHours;
       });
       return data;
     } else {
-      // Day view
       const data = [{ day: 'Today', productive: 0, neutral: 0, unproductive: 0, total: 0 }];
       filteredLogs.forEach(log => {
         const durationHours = (log.rawDuration || 0) / 3600;
@@ -482,600 +550,279 @@ const App = () => {
     }
   };
 
-  // Format time for display
-  const formatTime = (hours) => {
-    const h = Math.floor(hours);
-    const m = Math.round((hours - h) * 60);
-    return `${h}h ${m}m`;
-  };
-
   const chartData = getChartData();
-  
-  // Calculate total time from filtered logs
   const totalTime = filteredLogs.reduce((acc, log) => acc + ((log.rawDuration || 0) / 3600), 0);
-  // Dynamic stats from backend
   const percentageChange = view === 'Week' ? (stats?.weeklyChange || 0) : (stats?.dailyChange || 0);
 
   return (
     <ThemeProvider theme={theme}>
       <Box sx={{
-    fontFamily: 'Arial, sans-serif',
-    backgroundColor: '#f8fdff',
         width: '450px',
         height: '600px',
-    display: 'flex',
-    flexDirection: 'column',
-        justifyContent: 'space-between',
-        overflow: 'hidden',
-        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: 'background.default',
+        overflow: 'hidden'
       }}>
-        {/* Header with Title, Toggle, and Menu */}
+        
+        {/* --- App Bar --- */}
         <Box sx={{ 
+          px: 3, 
+          py: 2, 
           display: 'flex', 
-          justifyContent: 'space-between', 
           alignItems: 'center', 
-          mb: 2,
-          px: 2,
-          py: 1
+          justifyContent: 'space-between',
+          bgcolor: 'background.paper',
+          borderBottom: '1px solid',
+          borderColor: 'divider'
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Switch
-              checked={isExtensionActive}
-              onChange={handleActiveChange}
-              color="primary"
-              size="small"
-            />
-            <Typography variant="body2" color="text.secondary">
-              {isExtensionActive ? 'Active' : 'Inactive'}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ 
+              width: 32, 
+              height: 32, 
+              bgcolor: 'primary.main', 
+              borderRadius: '8px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold'
+            }}>
+              P
+            </Box>
+            <Typography variant="h6" color="text.primary">Productivv</Typography>
           </Box>
-          <Typography 
-            variant="h3" 
-            component="h1" 
-            color="text.primary" 
-            sx={{ 
-              m: 0,
-              fontWeight: 600,
-              color: '#2c3e50',
-              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
-            }}
+          
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: 20 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: isExtensionActive ? '#10b981' : '#cbd5e1' }} />
+              <Switch
+                checked={isExtensionActive}
+                onChange={handleActiveChange}
+                size="small"
+                sx={{ transform: 'scale(0.8)' }}
+              />
+            </Stack>
+            <IconButton size="small" onClick={(e) => setAnchorEl(e.currentTarget)}>
+              <MoreVert fontSize="small" />
+            </IconButton>
+          </Stack>
+
+          <Menu
+            anchorEl={anchorEl}
+            open={open}
+            onClose={() => setAnchorEl(null)}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            PaperProps={{ sx: { mt: 1, minWidth: 160, boxShadow: 3 } }}
           >
-            Productivv
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <button
-              onClick={(event) => setAnchorEl(event.currentTarget)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#2c3e50'
-              }}
-            >
-              <MoreVert />
-            </button>
-            <Menu
-              anchorEl={anchorEl}
-              open={open}
-              onClose={() => setAnchorEl(null)}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-            >
-              <MenuItem onClick={() => { setActiveTab('Home'); setAnchorEl(null); }}>
-                <ListItemIcon><FaHome /></ListItemIcon>
-                <ListItemText>Home</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setActiveTab('Logs'); setAnchorEl(null); }}>
-                <ListItemIcon><FaClock /></ListItemIcon>
-                <ListItemText>Logs</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setActiveTab('Settings'); setAnchorEl(null); }}>
-                <ListItemIcon><FaCog /></ListItemIcon>
-                <ListItemText>Settings</ListItemText>
-              </MenuItem>
-            </Menu>
-          </Box>
+            <MenuItem onClick={() => { setActiveTab('Home'); setAnchorEl(null); }}>
+              <ListItemIcon><HomeRounded fontSize="small" /></ListItemIcon>
+              <ListItemText>Home</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setActiveTab('Logs'); setAnchorEl(null); }}>
+              <ListItemIcon><AccessTimeFilledRounded fontSize="small" /></ListItemIcon>
+              <ListItemText>Logs</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setActiveTab('Settings'); setAnchorEl(null); }}>
+              <ListItemIcon><SettingsRounded fontSize="small" /></ListItemIcon>
+              <ListItemText>Settings</ListItemText>
+            </MenuItem>
+          </Menu>
         </Box>
 
-        {/* Conditional Rendering Based on Active Tab */}
-        <Box sx={{ 
-          flex: 1, 
-          p: 2, 
-          overflow: 'auto',
-          opacity: isExtensionActive ? 1 : 0.5,
-          transition: 'opacity 0.3s ease'
-        }}>
+        {/* --- Main Content --- */}
+        <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          
           {activeTab === 'Home' && (
-            <>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <ToggleButtonGroup
-                  value={view}
-                  exclusive
-                  onChange={(event, newView) => {
-                    if (newView !== null) {
-                      setView(newView);
-                      if (newView === 'Day') {
-                        setSelectedDate(formatDate(currentDate));
-                      } else {
-                        const { startOfWeek, endOfWeek } = getWeekDates(currentDate);
-                        setSelectedDate(formatDateRange(startOfWeek, endOfWeek));
-                      }
-                    }
-                  }}
-                  aria-label="view selection"
-                  sx={{
-                    '& .MuiToggleButton-root': {
-                      border: '1px solid #0988b1',
-                      color: '#0988b1',
-                      '&.Mui-selected': {
-                        backgroundColor: '#0988b1',
-                        color: 'white',
-                        '&:hover': {
-                          backgroundColor: '#077a9e',
-                        },
-                      },
-                      '&:hover': {
-                        backgroundColor: 'rgba(9, 136, 177, 0.1)',
-                      },
-                    },
-                  }}
-                >
-                  <ToggleButton value="Day">Day</ToggleButton>
-                  <ToggleButton value="Week">Week</ToggleButton>
-                </ToggleButtonGroup>
-                <Typography variant="body1" color="text.secondary">
-                  Current View: {view}
-                </Typography>
-              </Box>
-              
-              {/* Date Dropdown */}
-              <Box sx={{ mb: 3 }}>
-                <FormControl fullWidth>
-                  <InputLabel id="date-select-label">Select Date</InputLabel>
-                  <Select
-                    labelId="date-select-label"
-                    value={selectedDate}
-                    label="Select Date"
-                    onChange={(event) => setSelectedDate(event.target.value)}
-                    IconComponent={KeyboardArrowDown}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        '& fieldset': {
-                          borderColor: '#0988b1',
-                        },
-                        '&:hover fieldset': {
-                          borderColor: '#077a9e',
-                        },
-                        '&.Mui-focused fieldset': {
-                          borderColor: '#0988b1',
-                        },
-                      },
-                    }}
+            <Stack spacing={2}>
+              {/* Controls */}
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={6}>
+                  <ToggleButtonGroup
+                    value={view}
+                    exclusive
+                    onChange={(e, newView) => newView && setView(newView)}
+                    fullWidth
+                    size="small"
                   >
-                    {view === 'Week' ? (
-                      getWeekOptions(currentDate).map((option, index) => (
-                        <MenuItem key={index} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))
-                    ) : (
-                      getDayOptions(currentDate).map((option, index) => (
-                        <MenuItem key={index} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))
-                    )}
-                  </Select>
-                </FormControl>
-              </Box>
+                    <ToggleButton value="Day">Day</ToggleButton>
+                    <ToggleButton value="Week">Week</ToggleButton>
+                  </ToggleButtonGroup>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth size="small">
+                    <Select
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      displayEmpty
+                      sx={{ bgcolor: 'background.paper' }}
+                    >
+                      {view === 'Week' 
+                        ? getWeekOptions(currentDate).map((opt, i) => <MenuItem key={i} value={opt.value}>{opt.label}</MenuItem>)
+                        : getDayOptions(currentDate).map((opt, i) => <MenuItem key={i} value={opt.value}>{opt.label}</MenuItem>)
+                      }
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
 
-              {/* Chart Section */}
-              <Card sx={{ maxWidth: 400, mx: 'auto', mb: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" component="div" color="text.primary">
-                      Time Usage
-                    </Typography>
-                    <Typography variant="h5" component="div" color="primary" fontWeight="bold">
-                      {formatTime(totalTime)}
-                    </Typography>
-                    <Chip
-                      icon={<span>{percentageChange >= 0 ? '↗' : '↘'}</span>}
-                      label={`${Math.abs(percentageChange)}% from last ${view.toLowerCase()}`}
-                      color="primary"
-                      variant="outlined"
+              {/* Summary Card */}
+              <Card>
+                <CardContent sx={{ pb: '16px !important' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>Total Time</Typography>
+                      <Typography variant="h4" fontWeight="700" color="text.primary">
+                        {formatDuration(totalTime * 3600)}
+                      </Typography>
+                    </Box>
+                    <Chip 
+                      icon={percentageChange >= 0 ? <TrendingUp /> : <TrendingDown />}
+                      label={`${Math.abs(percentageChange).toFixed(1)}%`}
+                      color={percentageChange >= 0 ? "success" : "error"}
                       size="small"
+                      variant="soft" 
+                      sx={{ bgcolor: percentageChange >= 0 ? '#ecfdf5' : '#fef2f2', color: percentageChange >= 0 ? '#059669' : '#dc2626' }}
                     />
-                  </Box>
+                  </Stack>
                   
-                  <Box sx={{ height: 300 }}>
+                  <Box sx={{ height: 240, mt: 3, ml: -2 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                      <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                         <XAxis 
                           dataKey="day" 
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: '#666' }}
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 11, fill: '#94a3b8' }} 
+                          dy={10}
                         />
                         <YAxis 
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: '#666' }}
-                          domain={[0, 10]}
-                          ticks={[0, 5, 10]}
-                          tickFormatter={(value) => `${value}h`}
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 11, fill: '#94a3b8' }} 
+                          tickFormatter={(val) => `${val}h`}
                         />
-                        <ReferenceLine 
-                          y={6} 
-                          stroke="#333" 
-                          strokeDasharray="5 5" 
-                          label={{ value: "avg", position: "right", style: { fontSize: 10, fill: '#333' } }}
-                        />
-                        <Bar dataKey="productive" stackId="a" fill="#10b981" name="Productive" />
-                        <Bar dataKey="neutral" stackId="a" fill="#9ca3af" name="Neutral" />
-                        <Bar dataKey="unproductive" stackId="a" fill="#ef4444" name="Unproductive" />
+                        <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
+                        <Bar dataKey="productive" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} />
+                        <Bar dataKey="neutral" stackId="a" fill="#9ca3af" />
+                        <Bar dataKey="unproductive" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
                 </CardContent>
               </Card>
-            </>
+            </Stack>
           )}
 
           {activeTab === 'Logs' && (
-            <Box>
-              <Typography variant="h5" component="h2" color="text.primary" sx={{ mb: 2, fontWeight: 600 }}>
-                Activity Logs
-              </Typography>
-              
-              {/* Search and Filter Controls */}
-              <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={2}>
                 <TextField
-                  placeholder="Search logs..."
+                  placeholder="Search activity..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   size="small"
-                  sx={{ minWidth: 150, flex: 1 }}
-                />
-                <FilterToggle
-                  value={productiveFilter}
-                  exclusive
-                  onChange={handleProductiveFilterChange}
-                  size="small"
-                  sx={{
-                    '& .MuiToggleButton-root': {
-                      textTransform: 'none',
-                      fontSize: '0.75rem',
-                      padding: '6px 12px'
-                    }
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <Search fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+                    sx: { bgcolor: 'background.paper' }
                   }}
-                >
-                  <FilterButton value="all">All</FilterButton>
-                  <FilterButton value="productive">Productive</FilterButton>
-                  <FilterButton value="unproductive">Unproductive</FilterButton>
-                </FilterToggle>
-              </Box>
+                />
+              </Stack>
+              
+              <FilterToggle
+                value={productiveFilter}
+                exclusive
+                onChange={handleProductiveFilterChange}
+                size="small"
+                fullWidth
+              >
+                <ToggleButton value="all">All</ToggleButton>
+                <ToggleButton value="productive">Productive</ToggleButton>
+                <ToggleButton value="unproductive">Unproductive</ToggleButton>
+              </FilterToggle>
 
-              <TableContainer component={Paper} sx={{ boxShadow: 2, maxHeight: 300 }}>
-                <Table stickyHeader aria-label="activity logs table" size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>Title</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Duration</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Date</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Status</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {loading ? (
+              <Paper sx={{ overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: 0 }}>
+                <TableContainer sx={{ maxHeight: 340 }}>
+                  <Table stickyHeader size="small">
+                    <TableHead>
                       <TableRow>
-                        <TableCell colSpan={4} align="center">
-                          <Typography color="text.secondary">Loading...</Typography>
-                        </TableCell>
+                        <TableCell width="10%">Status</TableCell>
+                        <TableCell width="50%">Activity</TableCell>
+                        <TableCell align="right">Time</TableCell>
                       </TableRow>
-                    ) : filteredLogs.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center">
-                          <Typography color="text.secondary">
-                            {isExtensionActive ? 'No logs found' : 'Extension is inactive'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredLogs.map((log, index) => (
-                        <TableRow key={log.id}>
-                          <TableCell sx={{ fontSize: '0.875rem' }}>{log.title}</TableCell>
-                          <TableCell sx={{ fontSize: '0.875rem' }}>{log.duration}</TableCell>
-                          <TableCell sx={{ fontSize: '0.875rem' }}>
-                            {new Date(log.timestamp).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <Checkbox 
-                              checked={log.productive} 
-                              onChange={() => handleCheckboxChange(index)}
-                              sx={{ 
-                                color: log.productivityColor,
-                                '&.Mui-checked': {
-                                  color: log.productivityColor,
-                                },
-                              }}
-                              size="small"
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
+                    </TableHead>
+                    <TableBody>
+                      {loading ? (
+                        <TableRow><TableCell colSpan={3} align="center">Loading...</TableCell></TableRow>
+                      ) : filteredLogs.length === 0 ? (
+                        <TableRow><TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>No logs found</TableCell></TableRow>
+                      ) : (
+                        filteredLogs.map((log) => (
+                          <TableRow key={log.id} hover>
+                            <TableCell>
+                              {log.productive ? 
+                                <CheckCircleRounded sx={{ color: '#10b981', fontSize: 20 }} /> : 
+                                <CancelRounded sx={{ color: '#ef4444', fontSize: 20 }} />
+                              }
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" noWrap sx={{ maxWidth: 180, fontWeight: 500 }}>
+                                {log.title}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {log.date}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontWeight="600" color="text.primary">
+                                {log.duration}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Stack>
           )}
 
           {activeTab === 'Settings' && (
-            <Box>
-              {/* Settings Header */}
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <button
-                  onClick={() => setActiveTab('Home')}
-                  style={{
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-                    padding: '8px',
-                    marginRight: '16px',
-    display: 'flex',
-    alignItems: 'center',
-                    color: '#2c3e50'
-                  }}
-                >
-                  <ArrowBack />
-                </button>
-                <Typography variant="h5" component="h2" color="text.primary" sx={{ fontWeight: 600 }}>
-                  Settings
-                </Typography>
-              </Box>
-
-              {/* Search Bar */}
-              <Box sx={{ mb: 3 }}>
-                <TextField
-                  fullWidth
-                  placeholder="Search for a setting..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: '#f5f5f5',
-                      '& fieldset': {
-                        borderColor: '#e0e0e0',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#bdbdbd',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#0988b1',
-                      },
-                    },
-                  }}
-                />
-              </Box>
-
-              {/* Settings Accordions */}
-              <Box sx={{ '& .MuiAccordion-root': { boxShadow: 1, mb: 1 } }}>
-                <Accordion>
+            <Stack spacing={2}>
+              <Typography variant="h6">Settings</Typography>
+              {['Account', 'Notifications', 'Appearance', 'Privacy'].map((setting) => (
+                <Accordion key={setting} disableGutters elevation={0} sx={{ border: '1px solid #e2e8f0', '&:before': { display: 'none' } }}>
                   <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Person color="primary" />
-                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        Account
-                      </Typography>
-                    </Box>
+                    <Typography fontWeight="500">{setting}</Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <TextField
-                        label="Email"
-                        defaultValue="user@example.com"
-                        size="small"
-                        disabled
-                      />
-                      <TextField
-                        label="Display Name"
-                        defaultValue="Productivv User"
-                        size="small"
-                      />
-                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Settings for {setting} will appear here.
+                    </Typography>
                   </AccordionDetails>
                 </Accordion>
-
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Notifications color="primary" />
-                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        Notifications
-                      </Typography>
-                    </Box>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2">Email Alerts</Typography>
-                        <Switch size="small" defaultChecked />
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2">Desktop Notifications</Typography>
-                        <Switch size="small" />
-                      </Box>
-                    </Box>
-                  </AccordionDetails>
-                </Accordion>
-
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Visibility color="primary" />
-                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        Appearance
-                      </Typography>
-                    </Box>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <FormControl size="small">
-                        <InputLabel>Theme</InputLabel>
-                        <Select defaultValue="light" label="Theme">
-                          <MenuItem value="light">Light</MenuItem>
-                          <MenuItem value="dark">Dark</MenuItem>
-                          <MenuItem value="auto">Auto</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Box>
-                  </AccordionDetails>
-                </Accordion>
-
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Security color="primary" />
-                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        Privacy & Security
-                      </Typography>
-                    </Box>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2">Data Collection</Typography>
-                        <Switch size="small" defaultChecked />
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2">Analytics</Typography>
-                        <Switch size="small" />
-                      </Box>
-                    </Box>
-                  </AccordionDetails>
-                </Accordion>
-
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Help color="primary" />
-                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        Help and Support
-                      </Typography>
-                    </Box>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Need help? Contact us at support@productivv.com
-                      </Typography>
-                    </Box>
-                  </AccordionDetails>
-                </Accordion>
-
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Info color="primary" />
-                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        About
-                      </Typography>
-                    </Box>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <Typography variant="body2">Productivv v1.0.0</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Productivity tracking extension
-                      </Typography>
-                    </Box>
-                  </AccordionDetails>
-                </Accordion>
-              </Box>
-            </Box>
+              ))}
+            </Stack>
           )}
+
         </Box>
 
-        {/* Bottom Navigation */}
-        <Box sx={{
-    display: 'flex',
-    justifyContent: 'space-around',
-    backgroundColor: '#ffffff',
-          p: 0.5,
-    borderTop: '1px solid #ddd',
-    width: '100%',
-        }}>
-          <button
-            style={{
-              flex: 1,
-              background: 'none',
-              border: 'none',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              color: activeTab === 'Home' ? '#0988b1' : '#777',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '6px 0',
-              fontWeight: activeTab === 'Home' ? 'bold' : 'normal',
-            }}
-            onClick={() => setActiveTab('Home')}
-          >
-            <FaHome size={16} /> <span style={{ fontSize: '0.75rem' }}>Home</span>
-          </button>
-          <button
-            style={{
-    flex: 1,
-    background: 'none',
-    border: 'none',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-              color: activeTab === 'Logs' ? '#0988b1' : '#777',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '6px 0',
-              fontWeight: activeTab === 'Logs' ? 'bold' : 'normal',
-            }}
-            onClick={() => setActiveTab('Logs')}
-          >
-            <FaClock size={16} /> <span style={{ fontSize: '0.75rem' }}>Logs</span>
-          </button>
-          <button
-            style={{
-    flex: 1,
-    background: 'none',
-    border: 'none',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-              color: activeTab === 'Settings' ? '#0988b1' : '#777',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '6px 0',
-              fontWeight: activeTab === 'Settings' ? 'bold' : 'normal',
-            }}
-            onClick={() => setActiveTab('Settings')}
-          >
-            <FaCog size={16} /> <span style={{ fontSize: '0.75rem' }}>Settings</span>
-          </button>
-        </Box>
+        {/* --- Bottom Navigation --- */}
+        <BottomNavigation
+          value={activeTab}
+          onChange={(event, newValue) => setActiveTab(newValue)}
+          showLabels
+          elevation={3}
+        >
+          <BottomNavigationAction label="Home" value="Home" icon={<HomeRounded />} />
+          <BottomNavigationAction label="Logs" value="Logs" icon={<AccessTimeFilledRounded />} />
+          <BottomNavigationAction label="Settings" value="Settings" icon={<SettingsRounded />} />
+        </BottomNavigation>
+
       </Box>
     </ThemeProvider>
   );
