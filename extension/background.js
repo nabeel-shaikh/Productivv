@@ -7,6 +7,13 @@ let activeTitle = null;
 
 // Function to log activity to the backend
 async function logActivity(url, title, duration, startTimeStr) {
+  // Check if extension is active
+  const result = await chrome.storage.local.get(['isExtensionActive']);
+  if (result.isExtensionActive === false) {
+    console.log('Extension is inactive, skipping log.');
+    return;
+  }
+
   if (!url || !duration || duration < 1) return; // Ignore short/empty logs
 
   // Determine category/productivity (Basic logic for now, can be improved or done on backend)

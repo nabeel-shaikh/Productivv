@@ -19,17 +19,60 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log("✅ MongoDB connected successfully"))
 .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// Basic route (for testing)
-app.get('/', (req, res) => {
-  res.send('Server is running!');
-});
+// Helper: Extract domain from URL
+const getDomain = (url) => {
+  try {
+    const { hostname } = new URL(url);
+    return hostname.replace(/^www\./, '');
+  } catch (e) {
+    return url;
+  }
+};
 
 // API Routes
 
-// 1. Save a new activity log
+// 1. Save a new activity log (with duplicate merging logic)
 app.post('/api/activity', async (req, res) => {
   try {
-    const activity = new Activity(req.body);
+    const { url, title, duration, timestamp, productivity, category } = req.body;
+    
+    const domain = getDomain(url);
+    const logDate = new Date(timestamp);
+    
+    // 3 minute window
+    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
+
+    // Check for existing log with same TITLE within last 3 minutes
+    const existingLog = await Activity.findOne({
+      title: title, // Changed from domain to title based on user request
+      timestamp: { $gte: cutoff }
+    }).sort({ timestamp: -1 });
+
+    if (existingLog) {
+      // Merge: add duration, keep earliest timestamp (by not updating it)
+      // "If found, merge durations and keep the earliest timestamp."
+      existingLog.duration += duration;
+      
+      // "Preserve productivity and category values from the most recent log."
+      // implies we update these fields to the new incoming values
+      existingLog.productivity = productivity;
+      existingLog.category = category;
+      existingLog.title = title; 
+      
+      await existingLog.save();
+      return res.status(200).json({ message: 'Activity merged', activity: existingLog });
+    }
+
+    const activity = new Activity({
+      url,
+      domain,
+      title,
+      timestamp: logDate,
+      duration,
+      productivity,
+      category
+    });
+    
     await activity.save();
     res.status(201).json({ message: 'Activity saved', activity });
   } catch (err) {
@@ -41,7 +84,6 @@ app.post('/api/activity', async (req, res) => {
 // 2. Get all activity logs
 app.get('/api/activity', async (req, res) => {
   try {
-    // Support for date filtering if needed later (e.g. ?start=...&end=...)
     const { start, end } = req.query;
     let query = {};
     if (start && end) {
@@ -49,27 +91,113 @@ app.get('/api/activity', async (req, res) => {
     }
     
     const activities = await Activity.find(query).sort({ timestamp: -1 });
-    res.json(activities);
+    
+    // Add productivityColor and remove URL from response
+    const enhancedActivities = activities.map(act => {
+      let color = '#9e9e9e'; // neutral/gray
+      if (act.productivity === 'productive') color = '#4caf50'; // green
+      else if (act.productivity === 'unproductive') color = '#f44336'; // red
+      
+      return {
+        id: act._id,
+        title: act.title,
+        duration: act.duration,
+        timestamp: act.timestamp,
+        productivity: act.productivity,
+        category: act.category,
+        productivityColor: color
+        // URL explicitly excluded
+      };
+    });
+
+    res.json(enhancedActivities);
   } catch (err) {
     console.error('Error fetching activities:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 3. Get aggregated stats for graphs
+// 3. Get aggregated stats
 app.get('/api/stats', async (req, res) => {
   try {
-    // Aggregate total duration by category
-    const stats = await Activity.aggregate([
-      {
-        $group: {
-          _id: "$category",
-          totalDuration: { $sum: "$duration" },
-          count: { $sum: 1 }
+    // Current time setup
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - now.getDay());
+    thisWeekStart.setHours(0,0,0,0);
+    
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    const lastWeekEnd = new Date(thisWeekStart);
+
+    // Aggregation Helper
+    const getStats = async (start, end) => {
+      const result = await Activity.aggregate([
+        { $match: { timestamp: { $gte: start, $lt: end || new Date() } } },
+        {
+          $group: {
+            _id: null,
+            totalDuration: { $sum: "$duration" },
+            count: { $sum: 1 }
+          }
         }
-      }
+      ]);
+      return result[0] || { totalDuration: 0, count: 0 };
+    };
+
+    const [today, yesterday, thisWeek, lastWeek, allTime] = await Promise.all([
+      getStats(todayStart),
+      getStats(yesterdayStart, todayStart),
+      getStats(thisWeekStart),
+      getStats(lastWeekStart, lastWeekEnd),
+      Activity.aggregate([
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } }, // unique days
+            dailyTotal: { $sum: "$duration" }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            uniqueDays: { $sum: 1 },
+            grandTotal: { $sum: "$dailyTotal" }
+          }
+        }
+      ])
     ]);
-    res.json(stats);
+
+    // Calculate Percent Change
+    const calculateChange = (curr, prev) => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return ((curr - prev) / prev) * 100;
+    };
+
+    const dailyChange = calculateChange(today.totalDuration, yesterday.totalDuration);
+    const weeklyChange = calculateChange(thisWeek.totalDuration, lastWeek.totalDuration);
+
+    // Calculate Averages
+    const uniqueDays = allTime[0]?.uniqueDays || 1;
+    const uniqueWeeks = Math.max(1, Math.ceil(uniqueDays / 7));
+    const grandTotal = allTime[0]?.grandTotal || 0;
+
+    const dailyAverage = grandTotal / uniqueDays;
+    const weeklyAverage = grandTotal / uniqueWeeks;
+
+    // Return stats
+    res.json({
+      dailyChange,
+      weeklyChange,
+      dailyAverage,
+      weeklyAverage,
+      // Also include breakdown by category if needed for other charts
+      // (App.js might expect array for other uses, but specifically requested 'stats' object for summary)
+    });
+
   } catch (err) {
     console.error('Error fetching stats:', err);
     res.status(500).json({ error: err.message });

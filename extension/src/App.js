@@ -102,8 +102,15 @@ const getDayOptions = (currentDate) => {
   for (let i = 0; i < 7; i++) {
     const date = new Date(currentDate);
     date.setDate(currentDate.getDate() - i);
+    
+    // FIX: Use local YYYY-MM-DD format for the VALUE
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const localDateValue = `${year}-${month}-${day}`;
+
     options.push({
-      value: date.toISOString().split('T')[0],
+      value: localDateValue,
       label: formatDate(date)
     });
   }
@@ -116,8 +123,20 @@ const getWeekOptions = (currentDate) => {
     const date = new Date(currentDate);
     date.setDate(currentDate.getDate() - (i * 7));
     const { startOfWeek, endOfWeek } = getWeekDates(date);
+    
+    // FIX: Use local YYYY-MM-DD format for VALUE
+    const sYear = startOfWeek.getFullYear();
+    const sMonth = String(startOfWeek.getMonth() + 1).padStart(2, '0');
+    const sDay = String(startOfWeek.getDate()).padStart(2, '0');
+    const startStr = `${sYear}-${sMonth}-${sDay}`;
+
+    const eYear = endOfWeek.getFullYear();
+    const eMonth = String(endOfWeek.getMonth() + 1).padStart(2, '0');
+    const eDay = String(endOfWeek.getDate()).padStart(2, '0');
+    const endStr = `${eYear}-${eMonth}-${eDay}`;
+
     options.push({
-      value: `${startOfWeek.toISOString().split('T')[0]}_${endOfWeek.toISOString().split('T')[0]}`,
+      value: `${startStr}_${endStr}`,
       label: formatDateRange(startOfWeek, endOfWeek)
     });
   }
@@ -129,89 +148,36 @@ const getEmptyData = () => {
   return {};
 };
 
-// Mock data for fallback when API is not available
-const getMockActivityLogs = () => [
-  {
-    id: 1,
-    title: 'GitHub - Repository',
-    url: 'github.com/user/repo',
-    duration: '2h 15m',
-    date: new Date().toISOString().split('T')[0],
-    productive: true,
-    timestamp: new Date()
-  },
-  {
-    id: 2,
-    title: 'YouTube - Video',
-    url: 'youtube.com/watch',
-    duration: '45m',
-    date: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
-    productive: false,
-    timestamp: new Date(Date.now() - 86400000)
-  },
-  {
-    id: 3,
-    title: 'Stack Overflow',
-    url: 'stackoverflow.com/question',
-    duration: '1h 30m',
-    date: new Date(Date.now() - 172800000).toISOString().split('T')[0], // 2 days ago
-    productive: true,
-    timestamp: new Date(Date.now() - 172800000)
-  },
-  {
-    id: 4,
-    title: 'Reddit - Discussion',
-    url: 'reddit.com/r/programming',
-    duration: '20m',
-    date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
-    productive: false,
-    timestamp: new Date(Date.now() - 172800000)
-  },
-  {
-    id: 5,
-    title: 'Documentation',
-    url: 'docs.example.com',
-    duration: '3h 10m',
-    date: new Date().toISOString().split('T')[0],
-    productive: true,
-    timestamp: new Date()
-  }
-];
-
 // API connection
 const fetchLogsFromMongo = async (dateRange) => {
   try {
     let url = 'http://localhost:5001/api/activity';
-    // Append query params if dateRange is provided (simplification)
-    if (dateRange && dateRange !== 'all') {
-      // Logic to parse dateRange string into start/end dates can be added here
-      // For now, we fetch all and filter on frontend, or backend handles query params
-      // url += \`?range=\${dateRange}\`; 
-    }
 
     const response = await fetch(url);
     if (!response.ok) throw new Error('Network response was not ok');
     const data = await response.json();
     
-    // Map backend data to frontend format if necessary
-    // Backend: { url, title, duration, timestamp, productivity, category }
-    // Frontend expects: { id, title, url, duration (formatted?), date, productive, timestamp }
-    
-    return data.map((item, index) => ({
-      id: item._id || index,
-      title: item.title || 'No Title',
-      url: item.url,
-      duration: formatDuration(item.duration), // Helper needed?
-      rawDuration: item.duration,
-      date: new Date(item.timestamp).toISOString().split('T')[0],
-      productive: item.productivity === 'productive',
-      timestamp: new Date(item.timestamp),
-      category: item.category
-    }));
+    return data.map((item, index) => {
+      // FIX: Use local timezone date string for filtering
+      const localDate = new Date(item.timestamp).toLocaleDateString('en-CA'); // YYYY-MM-DD local
+
+      return {
+        id: item.id || index,
+        title: item.title || 'No Title',
+        // url: item.url, // Removed from backend response
+        duration: formatDuration(item.duration), 
+        rawDuration: item.duration,
+        date: localDate, // Use local date string
+        productive: item.productivity === 'productive',
+        productivityColor: item.productivityColor, // Use backend provided color
+        timestamp: new Date(item.timestamp),
+        category: item.category
+      };
+    });
 
   } catch (error) {
     console.error('Error fetching logs:', error);
-    return []; // Return empty array on error instead of mock
+    return []; 
   }
 };
 
@@ -422,6 +388,26 @@ const App = () => {
   };
 
 
+  useEffect(() => {
+    // Load active state from storage
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.local.get(['isExtensionActive'], (result) => {
+        if (result.isExtensionActive !== undefined) {
+          setIsExtensionActive(result.isExtensionActive);
+        }
+      });
+    }
+  }, []);
+
+  // Handle active switch change
+  const handleActiveChange = (e) => {
+    const checked = e.target.checked;
+    setIsExtensionActive(checked);
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.local.set({ isExtensionActive: checked });
+    }
+  };
+
   // Initialize data and selected date
   useEffect(() => {
     // Start with empty data - no tracking data initially
@@ -431,11 +417,25 @@ const App = () => {
     // Set initial selected date based on current view
     if (view === 'Week') {
       const { startOfWeek, endOfWeek } = getWeekDates(currentDate);
-      // Use the same value format as getWeekOptions
-      setSelectedDate(`${startOfWeek.toISOString().split('T')[0]}_${endOfWeek.toISOString().split('T')[0]}`);
+      
+      // FIX: Match format used in getWeekOptions (YYYY-MM-DD_YYYY-MM-DD)
+      const sYear = startOfWeek.getFullYear();
+      const sMonth = String(startOfWeek.getMonth() + 1).padStart(2, '0');
+      const sDay = String(startOfWeek.getDate()).padStart(2, '0');
+      const startStr = `${sYear}-${sMonth}-${sDay}`;
+
+      const eYear = endOfWeek.getFullYear();
+      const eMonth = String(endOfWeek.getMonth() + 1).padStart(2, '0');
+      const eDay = String(endOfWeek.getDate()).padStart(2, '0');
+      const endStr = `${eYear}-${eMonth}-${eDay}`;
+      
+      setSelectedDate(`${startStr}_${endStr}`);
     } else {
-      // Use ISO date format for Day view
-      setSelectedDate(currentDate.toISOString().split('T')[0]);
+      // FIX: Match format used in getDayOptions (YYYY-MM-DD)
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      setSelectedDate(`${year}-${month}-${day}`);
     }
   }, [view, currentDate]);
 
@@ -493,7 +493,8 @@ const App = () => {
   
   // Calculate total time from filtered logs
   const totalTime = filteredLogs.reduce((acc, log) => acc + ((log.rawDuration || 0) / 3600), 0);
-  const percentageChange = 0; // Placeholder for comparison logic
+  // Dynamic stats from backend
+  const percentageChange = view === 'Week' ? (stats?.weeklyChange || 0) : (stats?.dailyChange || 0);
 
   return (
     <ThemeProvider theme={theme}>
@@ -520,7 +521,7 @@ const App = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Switch
               checked={isExtensionActive}
-              onChange={(e) => setIsExtensionActive(e.target.checked)}
+              onChange={handleActiveChange}
               color="primary"
               size="small"
             />
@@ -722,12 +723,9 @@ const App = () => {
                           strokeDasharray="5 5" 
                           label={{ value: "avg", position: "right", style: { fontSize: 10, fill: '#333' } }}
                         />
-                        <Bar 
-                          dataKey="total" 
-                          fill="#0988b1" 
-                          radius={[2, 2, 0, 0]}
-                          maxBarSize={20}
-                        />
+                        <Bar dataKey="productive" stackId="a" fill="#10b981" name="Productive" />
+                        <Bar dataKey="neutral" stackId="a" fill="#9ca3af" name="Neutral" />
+                        <Bar dataKey="unproductive" stackId="a" fill="#ef4444" name="Unproductive" />
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
@@ -756,6 +754,13 @@ const App = () => {
                   exclusive
                   onChange={handleProductiveFilterChange}
                   size="small"
+                  sx={{
+                    '& .MuiToggleButton-root': {
+                      textTransform: 'none',
+                      fontSize: '0.75rem',
+                      padding: '6px 12px'
+                    }
+                  }}
                 >
                   <FilterButton value="all">All</FilterButton>
                   <FilterButton value="productive">Productive</FilterButton>
@@ -764,26 +769,25 @@ const App = () => {
               </Box>
 
               <TableContainer component={Paper} sx={{ boxShadow: 2, maxHeight: 300 }}>
-                <Table stickyHeader aria-label="activity logs table">
+                <Table stickyHeader aria-label="activity logs table" size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>Title</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 100 }}>URL</TableCell>
                       <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Duration</TableCell>
                       <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Date</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 100 }}>Productive</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 80 }}>Status</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={5} align="center">
+                        <TableCell colSpan={4} align="center">
                           <Typography color="text.secondary">Loading...</Typography>
                         </TableCell>
                       </TableRow>
                     ) : filteredLogs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} align="center">
+                        <TableCell colSpan={4} align="center">
                           <Typography color="text.secondary">
                             {isExtensionActive ? 'No logs found' : 'Extension is inactive'}
                           </Typography>
@@ -793,18 +797,20 @@ const App = () => {
                       filteredLogs.map((log, index) => (
                         <TableRow key={log.id}>
                           <TableCell sx={{ fontSize: '0.875rem' }}>{log.title}</TableCell>
-                          <TableCell sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
-                            {log.url}
-                          </TableCell>
                           <TableCell sx={{ fontSize: '0.875rem' }}>{log.duration}</TableCell>
                           <TableCell sx={{ fontSize: '0.875rem' }}>
-                            {new Date(log.date).toLocaleDateString()}
+                            {new Date(log.timestamp).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
                             <Checkbox 
                               checked={log.productive} 
                               onChange={() => handleCheckboxChange(index)}
-                              color="primary"
+                              sx={{ 
+                                color: log.productivityColor,
+                                '&.Mui-checked': {
+                                  color: log.productivityColor,
+                                },
+                              }}
                               size="small"
                             />
                           </TableCell>
