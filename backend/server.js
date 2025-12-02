@@ -31,7 +31,7 @@ const getDomain = (url) => {
 
 // API Routes
 
-// 1. Save a new activity log (with duplicate merging logic)
+// 1. Save a new activity log (with accumulation logic by DOMAIN)
 app.post('/api/activity', async (req, res) => {
   try {
     const { url, title, duration, timestamp, productivity, category } = req.body;
@@ -39,33 +39,36 @@ app.post('/api/activity', async (req, res) => {
     const domain = getDomain(url);
     const logDate = new Date(timestamp);
     
-    // 3 minute window
-    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
+    // Find the most recent log with the same DOMAIN
+    // Changed from 'title' to 'domain' based on user request
+    const lastLog = await Activity.findOne({ domain }).sort({ timestamp: -1 });
 
-    // Check for existing log with same TITLE within last 3 minutes
-    const existingLog = await Activity.findOne({
-      title: title, // Changed from domain to title based on user request
-      timestamp: { $gte: cutoff }
-    }).sort({ timestamp: -1 });
+    if (lastLog) {
+      const lastLogEnd = new Date(lastLog.timestamp).getTime() + (lastLog.duration * 1000);
+      const newLogStart = logDate.getTime();
+      // 5 minutes in milliseconds
+      const fiveMinutes = 5 * 60 * 1000;
 
-    if (existingLog) {
-      // Merge: add duration, keep earliest timestamp (by not updating it)
-      // "If found, merge durations and keep the earliest timestamp."
-      existingLog.duration += duration;
-      
-      // "Preserve productivity and category values from the most recent log."
-      // implies we update these fields to the new incoming values
-      existingLog.productivity = productivity;
-      existingLog.category = category;
-      existingLog.title = title; 
-      
-      await existingLog.save();
-      return res.status(200).json({ message: 'Activity merged', activity: existingLog });
+      // Check if the new log starts within 5 minutes of the last log ending
+      if (newLogStart - lastLogEnd <= fiveMinutes) {
+        // Accumulate duration
+        lastLog.duration += duration;
+        
+        // Update metadata to the latest
+        lastLog.productivity = productivity;
+        lastLog.category = category;
+        // Update title to latest visited page on that domain
+        lastLog.title = title; 
+        lastLog.url = url;
+        
+        await lastLog.save();
+        return res.status(200).json({ message: 'Activity merged by domain', activity: lastLog });
+      }
     }
 
     const activity = new Activity({
       url,
-      domain,
+      domain, // Ensure domain is saved
       title,
       timestamp: logDate,
       duration,
@@ -95,8 +98,8 @@ app.get('/api/activity', async (req, res) => {
     // Add productivityColor and remove URL from response
     const enhancedActivities = activities.map(act => {
       let color = '#9e9e9e'; // neutral/gray
-      if (act.productivity === 'productive') color = '#4caf50'; // green
-      else if (act.productivity === 'unproductive') color = '#f44336'; // red
+      if (act.productivity === 'productive') color = '#10b981'; // green
+      else if (act.productivity === 'unproductive') color = '#ef4444'; // red
       
       return {
         id: act._id,
@@ -106,7 +109,6 @@ app.get('/api/activity', async (req, res) => {
         productivity: act.productivity,
         category: act.category,
         productivityColor: color
-        // URL explicitly excluded
       };
     });
 
@@ -117,7 +119,23 @@ app.get('/api/activity', async (req, res) => {
   }
 });
 
-// 3. Get aggregated stats
+// 3. Update activity status (Productive <-> Unproductive)
+app.patch('/api/activity/:id', async (req, res) => {
+  try {
+    const { productivity } = req.body;
+    const activity = await Activity.findByIdAndUpdate(
+      req.params.id,
+      { productivity },
+      { new: true }
+    );
+    res.json(activity);
+  } catch (err) {
+    console.error('Error updating activity:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Get aggregated stats
 app.get('/api/stats', async (req, res) => {
   try {
     // Current time setup
@@ -194,8 +212,6 @@ app.get('/api/stats', async (req, res) => {
       weeklyChange,
       dailyAverage,
       weeklyAverage,
-      // Also include breakdown by category if needed for other charts
-      // (App.js might expect array for other uses, but specifically requested 'stats' object for summary)
     });
 
   } catch (err) {
