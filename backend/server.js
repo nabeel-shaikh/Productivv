@@ -29,12 +29,40 @@ const getDomain = (url) => {
   }
 };
 
+// Auto Categorization 
+const productive_domains = new Set(['github.com','stackoverflow.com',
+  'docs.python.org',
+  'w3schools.com',
+  'developer.mozilla.org',
+  'trello.com',
+  'jira.com',
+  'notion.so',
+  'calendar.google.com',
+  'mail.google.com']);
+
+  const categorizeURL = (url)=>{
+    const domain = getDomain(url);
+    
+    if (productive_domains.has(domain)){
+      return 'productive';
+    }
+    return 'unproductive'
+  };
+
+
+
 // API Routes
 
 // 1. Save a new activity log (with accumulation logic by DOMAIN)
 app.post('/api/activity', async (req, res) => {
   try {
-    const { url, title, duration, timestamp, productivity, category } = req.body;
+
+    const {url, title, duration, timestamp,category} = req.body;
+    let {productivity} = req.body;
+
+    if (!productivity || productivity === 'neutral'){
+      productivity = categorizeURL(url);
+    }
     
     const domain = getDomain(url);
     const logDate = new Date(timestamp);
