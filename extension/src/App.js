@@ -48,12 +48,116 @@ import {
   CheckCircleRounded, 
   CancelRounded, 
   TrendingUp, 
-  TrendingDown 
+  TrendingDown,
+  ArrowForwardRounded 
 } from '@mui/icons-material';
+import { 
+  SiPython, SiJavascript, SiOpenjdk, SiPostgresql, 
+  SiHtml5, SiCss3, SiCplusplus, SiPhp, SiMicrosoft 
+} from 'react-icons/si';
 
 /*
  * Productivv - Dynamic Time Tracking App
  */
+
+// --- Scroll Reveal Component ---
+const ScrollReveal = ({ children }) => {
+  const [isVisible, setVisible] = useState(false);
+  const domRef = React.useRef();
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => setVisible(entry.isIntersecting));
+    });
+    if (domRef.current) observer.observe(domRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <Box
+      ref={domRef}
+      sx={{
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+        transition: 'opacity 0.6s ease-out, transform 0.6s ease-out',
+        visibility: isVisible ? 'visible' : 'hidden',
+      }}
+    >
+      {children}
+    </Box>
+  );
+};
+
+// --- Project Card Component ---
+const ProjectCard = ({ title, tech, description, link, screenshot }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Card 
+      sx={{ 
+        borderRadius: 4, 
+        overflow: 'hidden', 
+        position: 'relative', 
+        border: '1px solid #e2e8f0',
+        transition: '0.3s',
+        '&:hover': { boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Box sx={{ position: 'relative', height: 160, bgcolor: '#f8fafc' }}>
+        {screenshot ? (
+          <img src={screenshot} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+            <Typography variant="body2">Preview Image</Typography>
+          </Box>
+        )}
+        {isHovered && (
+          <Box sx={{ 
+            position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.1)', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(3px)', transition: '0.3s'
+          }}>
+            <IconButton 
+              component="a"
+              href={link}
+              target="_blank"
+              sx={{ 
+                bgcolor: 'white', 
+                color: 'text.primary',
+                px: 3,
+                py: 1.5,
+                borderRadius: 20,
+                fontSize: '0.875rem',
+                fontWeight: 700,
+                boxShadow: 2,
+                '&:hover': {
+                  bgcolor: 'white',
+                  color: 'primary.main', // NOT white on hover
+                }
+              }}
+            >
+              View Code
+            </IconButton>
+          </Box>
+        )}
+      </Box>
+      <CardContent sx={{ p: 2.5 }}>
+        <Typography variant="h6" fontWeight="800" color="text.primary" sx={{ mb: 0.5 }}>{title}</Typography>
+        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 800, mb: 1.5, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {tech}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', lineHeight: 1.6, mb: 2 }}>
+          {description}
+        </Typography>
+        <Box component="a" href={link} target="_blank" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'primary.main', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem', '&:hover': { textDecoration: 'underline' } }}>
+          View on GitHub <ArrowForwardRounded sx={{ fontSize: 16 }} />
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
 
 // --- Utility Functions ---
 
