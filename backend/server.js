@@ -1,13 +1,19 @@
 require('dotenv').config();
+console.log("Starting server...");
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const Activity = require('./models/Activity');
 const OpenAI = require('openai');
 
+console.log("Modules loaded");
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+console.log("OpenAI initialized");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -49,9 +55,11 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
+console.log("Connecting to MongoDB...");
+console.log("URI exists:", !!process.env.MONGODB_URI);
+
 mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // 5 second timeout
 })
 .then(() => console.log("✅ MongoDB connected successfully"))
 .catch((err) => console.error("❌ MongoDB connection error:", err));
