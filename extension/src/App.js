@@ -448,7 +448,24 @@ const App = () => {
         filtered = filtered.filter(log => log.date >= startDate && log.date <= endDate);
       }
     }
-    setFilteredLogs(filtered);
+    
+    // Aggregate logs by title + date
+    const aggregated = {};
+    filtered.forEach(log => {
+      const key = `${log.title}_${log.date}`;
+      if (aggregated[key]) {
+        aggregated[key].rawDuration += log.rawDuration || 0;
+        aggregated[key].duration = formatDuration(aggregated[key].rawDuration);
+      } else {
+        aggregated[key] = { 
+          ...log, 
+          rawDuration: log.rawDuration || 0,
+          duration: formatDuration(log.rawDuration || 0)
+        };
+      }
+    });
+    
+    setFilteredLogs(Object.values(aggregated));
   };
 
   const loadActivityLogs = async () => {

@@ -25,7 +25,7 @@ async function logActivity(url, title, duration, startTimeStr) {
     return;
   }
 
-  if (!url || !duration || duration < 5) return; // Ignore logs < 5 seconds to reduce noise
+  if (!url || !duration || duration < 120) return; // Ignore logs < 2 minutes
 
   // Determine category/productivity (Basic logic for now, can be improved or done on backend)
   let productivity = 'neutral';
