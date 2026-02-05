@@ -310,8 +310,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     const productive = payload.find(p => p.name === 'Productive')?.value || 0;
     const unproductive = payload.find(p => p.name === 'Unproductive')?.value || 0;
-    const neutral = payload.find(p => p.name === 'Neutral')?.value || 0;
-    const total = productive + unproductive + neutral;
+    const total = productive + unproductive;
     const prodPercent = total > 0 ? Math.round((productive / total) * 100) : 0;
 
     return (
@@ -321,10 +320,6 @@ const CustomTooltip = ({ active, payload, label }) => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10b981' }} />
             <Typography variant="body2">Productive: <b>{formatDuration(productive * 3600)}</b></Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#9ca3af' }} />
-            <Typography variant="body2">Neutral: <b>{formatDuration(neutral * 3600)}</b></Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444' }} />
@@ -399,14 +394,17 @@ const App = () => {
     if (newFilter !== null) setProductiveFilter(newFilter);
   };
 
-  // Handle status toggle with Backend Persistence
-  const handleStatusToggle = async (id, currentProductiveState) => {
+  // Handle status toggle with Backend Persistence - syncs all logs with same title
+  const handleStatusToggle = async (id, currentProductiveState, title) => {
     // Calculate new status string for backend
     const newStatus = currentProductiveState ? 'unproductive' : 'productive';
     
-    // Optimistic UI update
+    // Find all logs with the same title to update them together
+    const logsToUpdate = activityLogs.filter(log => log.title === title);
+    
+    // Optimistic UI update - update all logs with same title
     setActivityLogs(prev => prev.map(log => 
-      log.id === id ? { 
+      log.title === title ? { 
         ...log, 
         productive: !currentProductiveState,
         productivityColor: !currentProductiveState ? '#10b981' : '#ef4444'
@@ -414,16 +412,18 @@ const App = () => {
     ));
 
     try {
-      await fetch(`http://localhost:5001/api/activity/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productivity: newStatus })
-      });
+      // Update all logs with the same title in backend
+      await Promise.all(logsToUpdate.map(log => 
+        fetch(`http://localhost:5001/api/activity/${log.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productivity: newStatus })
+        })
+      ));
       // Refresh logs to ensure sync
       loadActivityLogs();
     } catch (error) {
       console.error('Error updating status:', error);
-      // Revert on error (could be improved)
       loadActivityLogs();
     }
   };
@@ -536,7 +536,7 @@ const App = () => {
   const getChartData = () => {
     if (view === 'Week') {
       const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-      const data = days.map(d => ({ day: d, productive: 0, neutral: 0, unproductive: 0, total: 0 }));
+      const data = days.map(d => ({ day: d, productive: 0, unproductive: 0, total: 0 }));
       
       filteredLogs.forEach(log => {
         if (!log.timestamp) return;
@@ -550,7 +550,7 @@ const App = () => {
       });
       return data;
     } else {
-      const data = [{ day: 'Today', productive: 0, neutral: 0, unproductive: 0, total: 0 }];
+      const data = [{ day: 'Today', productive: 0, unproductive: 0, total: 0 }];
       filteredLogs.forEach(log => {
         const durationHours = (log.rawDuration || 0) / 3600;
         if (log.productive) data[0].productive += durationHours;
@@ -621,7 +621,7 @@ const App = () => {
                       <Typography variant="body2" color="text.secondary" gutterBottom>Total Time</Typography>
                       <Typography variant="h4" fontWeight="700" color="text.primary">{formatDuration(totalTime * 3600)}</Typography>
                     </Box>
-                    <Chip icon={percentageChange >= 0 ? <TrendingUp /> : <TrendingDown />} label={`${Math.abs(percentageChange).toFixed(1)}%`} color={percentageChange >= 0 ? "success" : "error"} size="small" variant="soft" sx={{ bgcolor: percentageChange >= 0 ? '#ecfdf5' : '#fef2f2', color: percentageChange >= 0 ? '#059669' : '#dc2626' }} />
+                    <Chip icon={percentageChange >= 0 ? <TrendingUp /> : <TrendingDown />} label={`${Math.abs(percentageChange).toFixed(1)}`} color={percentageChange >= 0 ? "success" : "error"} size="small" variant="soft" sx={{ bgcolor: percentageChange >= 0 ? '#ecfdf5' : '#fef2f2', color: percentageChange >= 0 ? '#059669' : '#dc2626' }} />
                   </Stack>
                   
                   <Box sx={{ height: 240, mt: 3, ml: -2 }}>
@@ -631,9 +631,8 @@ const App = () => {
                         <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} dy={10} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(val) => `${val}h`} />
                         <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                        {/* Side-by-side bars: Remove stackId */}
+                        {/* Side-by-side bars */}
                         <Bar dataKey="productive" name="Productive" fill="#10b981" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="neutral" name="Neutral" fill="#9ca3af" radius={[4, 4, 0, 0]} />
                         <Bar dataKey="unproductive" name="Unproductive" fill="#ef4444" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -717,7 +716,7 @@ const App = () => {
                             <TableCell>
                               <Checkbox 
                                 checked={log.productive} 
-                                onChange={() => handleStatusToggle(log.id, log.productive)}
+                                onChange={() => handleStatusToggle(log.id, log.productive, log.title)}
                                 icon={<CancelRounded sx={{ color: '#ef4444' }} />}
                                 checkedIcon={<CheckCircleRounded sx={{ color: '#10b981' }} />}
                               />
@@ -748,12 +747,34 @@ const App = () => {
           {activeTab === 'Settings' && (
             <Stack spacing={2}>
               <Typography variant="h6">Settings</Typography>
-              {['Account', 'Notifications', 'Appearance', 'Privacy'].map((setting) => (
-                <Accordion key={setting} disableGutters elevation={0} sx={{ border: '1px solid #e2e8f0', '&:before': { display: 'none' } }}>
-                  <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight="500">{setting}</Typography></AccordionSummary>
-                  <AccordionDetails><Typography variant="body2" color="text.secondary">Settings for {setting} will appear here.</Typography></AccordionDetails>
-                </Accordion>
-              ))}
+              
+              {/* Appearance */}
+              <Accordion disableGutters elevation={0} sx={{ border: '1px solid #e2e8f0', '&:before': { display: 'none' } }}>
+                <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight="500">Appearance</Typography></AccordionSummary>
+                <AccordionDetails>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="body2" color="text.secondary">Dark Mode</Typography>
+                    <Switch size="small" disabled />
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Dark mode coming soon.
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
+              
+              {/* Privacy */}
+              <Accordion disableGutters elevation={0} sx={{ border: '1px solid #e2e8f0', '&:before': { display: 'none' } }}>
+                <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight="500">Privacy</Typography></AccordionSummary>
+                <AccordionDetails>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Productivv does not store or access any personal information. All browsing data is stored locally on your device and in your personal database.
+                  </Typography>
+                  <Divider sx={{ my: 1.5 }} />
+                  <Typography variant="caption" color="text.secondary">
+                    © 2026 Productivv. All rights reserved.
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
             </Stack>
           )}
         </Box>
