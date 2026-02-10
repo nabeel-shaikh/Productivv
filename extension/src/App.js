@@ -616,13 +616,10 @@ const App = () => {
 
               <Card>
                 <CardContent sx={{ pb: '16px !important' }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>Total Time</Typography>
-                      <Typography variant="h4" fontWeight="700" color="text.primary">{formatDuration(totalTime * 3600)}</Typography>
-                    </Box>
-                    <Chip icon={percentageChange >= 0 ? <TrendingUp /> : <TrendingDown />} label={`${Math.abs(percentageChange).toFixed(1)}`} color={percentageChange >= 0 ? "success" : "error"} size="small" variant="soft" sx={{ bgcolor: percentageChange >= 0 ? '#ecfdf5' : '#fef2f2', color: percentageChange >= 0 ? '#059669' : '#dc2626' }} />
-                  </Stack>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>Total Time</Typography>
+                    <Typography variant="h4" fontWeight="700" color="text.primary">{formatDuration(totalTime * 3600)}</Typography>
+                  </Box>
                   
                   <Box sx={{ height: 240, mt: 3, ml: -2 }}>
                     <ResponsiveContainer width="100%" height="100%">
