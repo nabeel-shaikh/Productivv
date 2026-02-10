@@ -174,12 +174,11 @@ const formatDateRange = (startDate, endDate) => {
 
 const getWeekDates = (date) => {
   const startOfWeek = new Date(date);
-  const day = startOfWeek.getDay();
-  const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); 
-  startOfWeek.setDate(diff);
+  const day = startOfWeek.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  startOfWeek.setDate(startOfWeek.getDate() - day); // Go back to Sunday
   
   const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
   
   return { startOfWeek, endOfWeek };
 };
